@@ -1,23 +1,3 @@
-import os
-import time
-import subprocess
-import re
-import json
-
-# [1. 시스템 초기화 & 패키지 설치 (안전장치)]
-print("🔄 시스템 재부팅 및 오류 수정 중...")
-os.system("pkill -9 -f streamlit")
-os.system("pkill -9 -f cloudflared")
-os.system("rm -f app.py")
-os.system("rm -f elpis_db.json")
-
-# 필수 패키지 재설치 (런타임 초기화 대비)
-subprocess.run(["pip", "install", "streamlit", "plotly", "pandas", "-q"])
-subprocess.run(["wget", "-q", "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64", "-O", "cloudflared"])
-os.system("chmod +x cloudflared")
-
-# [2. ELPIS EXCHANGE 마스터 코드 (새로고침 방지 완벽 적용)]
-app_code = """
 import streamlit as st
 import pandas as pd
 import datetime
@@ -31,7 +11,7 @@ import os
 st.set_page_config(layout="wide", page_title="ELPIS EXCHANGE", page_icon="📈")
 
 # --- [CSS 스타일 : 프리미엄 금융 앱 디자인] ---
-st.markdown(\"\"\"
+st.markdown("""
     <style>
     @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
 
@@ -202,7 +182,7 @@ st.markdown(\"\"\"
     /* [Big Font] */
     .big-font { font-size: 32px; font-weight: 800; letter-spacing: -1px; }
     </style>
-\"\"\", unsafe_allow_html=True)
+""", unsafe_allow_html=True)
 
 # --- [데이터 영구 저장 시스템] ---
 DB_FILE = 'elpis_db.json'
@@ -868,29 +848,3 @@ else:
     with tabs[6]:
         st.subheader("💱 거래소")
         st.info("Coming Soon")
-"""
-
-with open("app.py", "w") as f:
-    f.write(app_code)
-
-# [3. 실행]
-print("🚀 [ELPIS EXCHANGE] 서버 가동 시작...")
-subprocess.Popen(["streamlit", "run", "app.py", "--server.port", "8501", "--theme.base", "light"])
-with open("cf.log", "w") as log_file:
-    process = subprocess.Popen(["./cloudflared", "tunnel", "--url", "http://localhost:8501"], stdout=log_file, stderr=log_file)
-
-print("⏳ 접속 링크 생성 중... (약 10초 소요)")
-found_url = False
-for i in range(30):
-    time.sleep(1)
-    if os.path.exists("cf.log"):
-        with open("cf.log", "r") as f:
-            content = f.read()
-            match = re.search(r'https://[a-zA-Z0-9-]+\.trycloudflare\.com', content)
-            if match:
-                print(f"\n👉 {match.group()} 👈\n")
-                found_url = True
-                break
-if not found_url: print("❌ 실패. 다시 실행하세요.")
-else:
-    while True: time.sleep(10)
