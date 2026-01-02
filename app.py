@@ -848,3 +848,4 @@ else:
     with tabs[6]:
         st.subheader("💱 거래소")
         st.info("Coming Soon")
+
