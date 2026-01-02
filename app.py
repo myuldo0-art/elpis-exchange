@@ -1,4 +1,4 @@
-import streamlit as st
+Import streamlit as st
 import pandas as pd
 import datetime
 import plotly.graph_objects as go
@@ -15,15 +15,17 @@ st.markdown("""
     <style>
     @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
 
-    /* [🚨 핵심 수정: 모든 탭에서 당겨서 새로고침(Pull-to-Refresh) 차단] */
-    html, body, .stApp {
+    /* [🚨 핵심 수정: 당겨서 새로고침(Pull-to-Refresh) 완벽 차단] */
+    html, body {
         overscroll-behavior-y: none !important;
         overscroll-behavior: none !important;
     }
-    /* 스트림릿 메인 뷰 컨테이너 스크롤 체인 끊기 */
-    div[data-testid="stAppViewContainer"] {
+    /* 스트림릿 메인 컨테이너 및 앱 전체 영역 */
+    .stApp, div[data-testid="stAppViewContainer"] {
         overscroll-behavior-y: none !important;
         overscroll-behavior: none !important;
+        /* 모바일 터치 액션 제어 (상하 스크롤만 허용) */
+        touch-action: pan-y !important; 
     }
 
     /* [전체 레이아웃] */
@@ -848,4 +850,3 @@ else:
     with tabs[6]:
         st.subheader("💱 거래소")
         st.info("Coming Soon")
-
