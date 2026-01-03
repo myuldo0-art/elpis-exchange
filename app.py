@@ -707,31 +707,48 @@ else:
         else:
             st.info("아직 도착한 메시지가 없습니다.")
 
-    # [② 탭: 관심] (UI 대수선: 토스 스타일 리스트 + 기능 완벽 연동)
+    # [② 탭: 관심] (모바일 강제 가로 정렬 CSS 적용)
     with tabs[1]:
-        # 1. 헤더: 깔끔한 타이틀
-        st.markdown("<h3 style='margin-bottom: 20px; font-weight: 800;'>관심 종목</h3>", unsafe_allow_html=True)
+        # [CSS Patch] 모바일 화면(폭 640px 이하)에서 강제 가로 정렬
+        st.markdown("""
+        <style>
+        @media (max-width: 640px) {
+            div[data-testid="stHorizontalBlock"] {
+                flex-direction: row !important;
+                flex-wrap: nowrap !important;
+            }
+            div[data-testid="column"] {
+                flex: 1 !important;
+                min-width: 0 !important; /* 내용물이 커도 강제로 줄임 */
+            }
+            /* 버튼 패딩 축소 */
+            .stButton > button {
+                padding: 0rem 0.2rem !important;
+                font-size: 11px !important; 
+                height: 35px !important;
+            }
+        }
+        </style>
+        """, unsafe_allow_html=True)
 
-        # 2. 리스트 헤더 (회색 작은 글씨로 컬럼 정의)
-        # 비율: 종목명(4) | 현재가(3) | 등락률(2.5) | 삭제버튼(1)
-        h1, h2, h3, h4 = st.columns([4, 3, 2.5, 1])
-        h1.markdown("<span style='color:#8B95A1; font-size:13px; padding-left:4px;'>종목명</span>", unsafe_allow_html=True)
-        h2.markdown("<span style='color:#8B95A1; font-size:13px; display:block; text-align:right;'>현재가</span>", unsafe_allow_html=True)
-        h3.markdown("<span style='color:#8B95A1; font-size:13px; display:block; text-align:right;'>등락률</span>", unsafe_allow_html=True)
+        # 1. 헤더
+        st.markdown("<h4 style='margin-bottom: 10px; font-weight: 800;'>관심 종목</h4>", unsafe_allow_html=True)
+
+        # 2. 리스트 헤더
+        # 비율: 종목(3.5) : 현재가(3) : 등락(2.5) : 삭제(1)
+        h1, h2, h3, h4 = st.columns([3.5, 3, 2.5, 1])
+        h1.markdown("<span style='color:#8B95A1; font-size:12px; padding-left:2px;'>종목</span>", unsafe_allow_html=True)
+        h2.markdown("<span style='color:#8B95A1; font-size:12px; display:block; text-align:right;'>현재가</span>", unsafe_allow_html=True)
+        h3.markdown("<span style='color:#8B95A1; font-size:12px; display:block; text-align:right;'>등락</span>", unsafe_allow_html=True)
         h4.markdown("") 
-        st.markdown("<hr style='margin: 8px 0 0 0; border: 0; border-top: 1px solid #E5E8EB;'>", unsafe_allow_html=True)
+        st.markdown("<hr style='margin: 5px 0 0 0; border: 0; border-top: 1px solid #E5E8EB;'>", unsafe_allow_html=True)
 
-        # 3. 데이터 로드 (본인 아이디 제외하고 순수 관심 종목만)
+        # 3. 데이터 로드
         targets = list(st.session_state['interested_codes'])
         targets = [t for t in targets if t != user_id] 
 
         if not targets:
-            st.markdown("""
-                <div style='text-align:center; padding: 60px 0; color:#8B95A1;'>
-                    <p style='font-size:15px; margin-bottom:8px;'>관심 종목이 없습니다.</p>
-                    <p style='font-size:12px;'>'현재가' 탭에서 종목을 검색해보세요.</p>
-                </div>
-            """, unsafe_allow_html=True)
+            st.markdown("<div style='text-align:center; padding: 40px 0; color:#8B95A1; font-size:13px;'>관심 종목이 없습니다.</div>", unsafe_allow_html=True)
 
         # 4. 리스트 출력 루프
         for code in targets:
@@ -740,7 +757,7 @@ else:
                 c_price = info['price']
                 c_change = info['change']
 
-                # 색상 및 화살표 로직 (상승: 빨강 / 하락: 파랑 / 보합: 회색)
+                # 색상 설정
                 if c_change > 0:
                     color = "#E22A2A"
                     bg_color = "rgba(226, 42, 42, 0.1)"
@@ -756,44 +773,41 @@ else:
 
                 # [카드형 리스트 레이아웃]
                 with st.container():
-                    # 상단 여백으로 리스트 간격 확보
-                    st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
+                    st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
                     
-                    r1, r2, r3, r4 = st.columns([4, 3, 2.5, 1])
+                    # [핵심] 컬럼 비율을 모바일에 맞춰 타이트하게 잡음
+                    r1, r2, r3, r4 = st.columns([3.5, 3, 2.5, 1])
 
-                    # Col 1: 종목명 (클릭 시 프로필 모달 연동)
+                    # Col 1: 종목명 (버튼)
                     with r1:
-                        # use_container_width=True로 꽉 차게 만들어 클릭 영역 확보
                         if st.button(f"{info['name']}", key=f"fav_btn_{code}", type="secondary", use_container_width=True):
-                            st.session_state['view_profile_id'] = code # 프로필 ID 설정
-                            st.rerun() # 즉시 리런 -> 최상단 모달 로직 실행됨
+                            st.session_state['view_profile_id'] = code 
+                            st.rerun() 
                     
-                    # Col 2: 현재가 (우측 정렬 + 굵게)
+                    # Col 2: 현재가 (폰트 사이즈 조절, 줄바꿈 방지)
                     with r2:
                         st.markdown(f"""
-                            <div style='text-align:right; padding-top: 10px; font-weight:700; font-size:15px; color:{color};'>
+                            <div style='text-align:right; padding-top: 8px; font-weight:700; font-size:14px; color:{color}; white-space: nowrap;'>
                                 {c_price:,}
                             </div>
                         """, unsafe_allow_html=True)
 
-                    # Col 3: 등락률 (뱃지 스타일)
+                    # Col 3: 등락률 (뱃지, 줄바꿈 방지)
                     with r3:
                         st.markdown(f"""
-                            <div style='margin-top: 6px; float:right; background-color: {bg_color}; color: {color}; padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: 600;'>
+                            <div style='margin-top: 6px; float:right; background-color: {bg_color}; color: {color}; padding: 3px 6px; border-radius: 6px; font-size: 11px; font-weight: 600; white-space: nowrap;'>
                                 {arrow} {abs(c_change)}%
                             </div>
                         """, unsafe_allow_html=True)
 
-                    # Col 4: 삭제 버튼 (X) -> DB 저장 연동
+                    # Col 4: 삭제 버튼 (여백 없이 딱 붙임)
                     with r4:
-                        st.markdown("<div style='height: 3px;'></div>", unsafe_allow_html=True)
-                        if st.button("✕", key=f"del_{code}"):
+                        if st.button("✕", key=f"del_{code}"): 
                             st.session_state['interested_codes'].remove(code)
-                            save_db() # [중요] 구글 시트 즉시 반영
+                            save_db()
                             st.rerun()
 
-                    # 하단 구분선 (리스트 느낌)
-                    st.markdown("<hr style='margin: 12px 0 0 0; border: 0; border-top: 1px solid #F2F4F6;'>", unsafe_allow_html=True)
+                    st.markdown("<hr style='margin: 8px 0 0 0; border: 0; border-top: 1px solid #F2F4F6;'>", unsafe_allow_html=True)
 
     # [④ 탭: 현재가]
     with tabs[2]:
