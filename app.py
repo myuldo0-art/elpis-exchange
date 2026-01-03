@@ -79,14 +79,25 @@ st.markdown("""
     <style>
     @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
 
-    /* [Pull-to-Refresh 차단] */
-    html, body, .stApp {
-        overscroll-behavior-y: none !important;
+    /* [Pull-to-Refresh 강력 차단 수정본] */
+    html, body {
         overscroll-behavior: none !important;
+        overscroll-behavior-y: none !important;
     }
+    /* Streamlit 메인 컨테이너 고정 및 스크롤 제어 */
     div[data-testid="stAppViewContainer"] {
-        overscroll-behavior-y: none !important;
         overscroll-behavior: none !important;
+        overscroll-behavior-y: none !important;
+        position: fixed !important;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        overflow-y: auto !important; /* 내부 스크롤은 허용하되 전체 페이지 당김 방지 */
+    }
+    /* 헤더 영역 터치 방지 */
+    header[data-testid="stHeader"] {
+        z-index: 1;
     }
 
     /* [전체 레이아웃] */
@@ -837,5 +848,3 @@ else:
     with tabs[6]:
         st.subheader("💱 거래소")
         st.info("Coming Soon")
-
-
