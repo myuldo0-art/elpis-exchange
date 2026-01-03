@@ -1,39 +1,148 @@
-import streamlit as st
-import pandas as pd
-import datetime
-import plotly.graph_objects as go
-import time
-import random
-import json
-import os
-import gspread
-from google.oauth2.service_account import Credentials
+# --- [CSS 스타일 : 프리미엄 금융 앱 디자인 (강력 숨김 버전)] ---
+st.markdown("""
+    <style>
+    @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
 
-# --- [0. 구글 시트 DB 연결 설정] ---
-# Streamlit Secrets에서 키 가져오기 & 캐싱
-@st.cache_resource
-def init_connection():
-    scope = [
-        "https://www.googleapis.com/auth/spreadsheets",
-        "https://www.googleapis.com/auth/drive",
-    ]
-    credentials_dict = st.secrets["gcp_service_account"]
-    creds = Credentials.from_service_account_info(credentials_dict, scopes=scope)
-    client = gspread.authorize(creds)
-    return client
+    /* [🚨 중요: 우측 하단 버튼 및 상단 바 강력 숨김] */
+    header {visibility: hidden !important;}
+    footer {visibility: hidden !important; display: none !important;}
+    #MainMenu {visibility: hidden !important; display: none !important;}
+    div[data-testid="stStatusWidget"] {visibility: hidden !important; display: none !important;}
+    .stDeployButton {display: none !important;}
+    div[class*="viewerBadge"] {display: none !important;}
 
-# --- [데이터 영구 저장 시스템 : 구글 시트 버전] ---
-# 복잡한 객체 구조를 유지하기 위해 JSON String 형태로 시트 A1 셀에 통째로 저장/로드합니다.
+    /* [Pull-to-Refresh 차단] */
+    html, body {
+        overscroll-behavior: none !important;
+        overscroll-behavior-y: none !important;
+    }
+    div[data-testid="stAppViewContainer"] {
+        overscroll-behavior: none !important;
+        overscroll-behavior-y: none !important;
+        position: fixed !important;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        overflow-y: auto !important;
+    }
+    header[data-testid="stHeader"] {
+        z-index: 1;
+    }
 
-def load_db():
-    """구글 시트에서 전체 데이터를 JSON으로 불러옴"""
-    try:
-        client = init_connection()
-        sh = client.open("ELPIS_DB") # 구글 시트 파일명
-        worksheet = sh.worksheet("JSON_DATA") # 탭 이름
-        
-        # A1 셀의 데이터를 가져옴 (매우 긴 텍스트)
-        raw_data = worksheet.acell('A1').value
+    /* [전체 레이아웃] */
+    html, body, .stApp {
+        font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif !important;
+        background-color: #F2F4F6;
+        color: #191F28;
+    }
+    .main { background-color: #F2F4F6; }
+    
+    /* [카드 디자인] */
+    div[data-testid="stVerticalBlock"] > div { background-color: transparent; }
+    .stMetric {
+        background-color: #FFFFFF !important;
+        border: 1px solid #E5E8EB !important;
+        border-radius: 16px !important;
+        padding: 15px !important;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.04) !important;
+    }
+    
+    /* [버튼 스타일] */
+    .stButton>button {
+        width: 100%;
+        border-radius: 12px !important;
+        font-weight: 600 !important;
+        height: 52px !important;
+        font-size: 16px !important;
+        border: none !important;
+        transition: all 0.2s ease;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    button[kind="primary"] { background-color: #3182F6 !important; color: white !important; }
+    button[kind="primary"]:hover { background-color: #1B64DA !important; }
+    button[kind="secondary"] { background-color: #FFFFFF !important; color: #4E5968 !important; border: 1px solid #D1D6DB !important; }
+    
+    /* [입력 필드] */
+    .stTextInput>div>div>input, .stNumberInput>div>div>input {
+        background-color: #FFFFFF !important;
+        border: 1px solid #D1D6DB !important;
+        border-radius: 10px !important;
+        height: 48px !important;
+        font-size: 16px !important;
+        color: #191F28 !important;
+    }
+    .stTextInput>div>div>input:focus, .stNumberInput>div>div>input:focus {
+        border-color: #3182F6 !important;
+        box-shadow: 0 0 0 2px rgba(49, 130, 246, 0.2) !important;
+    }
+
+    /* [텍스트 컬러] */
+    .up-text { color: #E22A2A !important; font-weight: 700; }
+    .down-text { color: #2A6BE2 !important; font-weight: 700; }
+    .flat-text { color: #333333 !important; font-weight: 700; }
+    .small-gray { font-size: 13px; color: #8B95A1; margin-top: 2px; }
+    
+    /* [프로필 카드] */
+    .profile-card {
+        background: white;
+        border-radius: 20px;
+        padding: 24px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        text-align: center;
+        margin-bottom: 20px;
+        border: 1px solid #F2F4F6;
+    }
+    .profile-card h2 { margin: 0; font-size: 22px; color: #191F28; }
+    .profile-card p { color: #4E5968; font-size: 14px; margin: 8px 0; }
+    
+    /* [호가창] */
+    .hoga-container {
+        font-family: 'Pretendard', sans-serif;
+        font-size: 14px;
+        width: 100%;
+        background: white;
+        border-radius: 12px;
+        overflow: hidden;
+        border: 1px solid #E5E8EB;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    }
+    .hoga-row { display: flex; height: 38px; align-items: center; border-bottom: 1px solid #F9FAFB; }
+    .sell-bg { background-color: rgba(66, 133, 244, 0.04); }
+    .buy-bg { background-color: rgba(234, 67, 53, 0.04); }
+    .cell-vol { flex: 1; text-align: right; padding-right: 12px; color: #4E5968; font-size: 12px; letter-spacing: -0.5px; }
+    .cell-price { 
+        flex: 1.2; text-align: center; font-weight: 700; font-size: 15px; 
+        background-color: #ffffff; 
+        border-left: 1px solid #F2F4F6; border-right: 1px solid #F2F4F6;
+        cursor: pointer;
+    }
+    .cell-vol-buy { flex: 1; text-align: left; padding-left: 12px; color: #4E5968; font-size: 12px; letter-spacing: -0.5px; }
+    .cell-empty { flex: 1; }
+    .price-up { color: #E22A2A; }
+    .price-down { color: #2A6BE2; }
+    .current-price-box { border: 2px solid #191F28 !important; background-color: #FFF !important; color: #191F28 !important; font-size: 16px !important; }
+    
+    /* [채팅] */
+    .chat-box {
+        background-color: #FFFFFF;
+        padding: 14px;
+        border-radius: 16px;
+        margin-bottom: 8px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        border: 1px solid #F2F4F6;
+    }
+    .chat-user { font-weight: 700; font-size: 14px; color: #191F28; margin-bottom: 4px; }
+    .chat-msg { font-size: 15px; color: #333D4B; line-height: 1.4; }
+    .chat-time { font-size: 11px; color: #8B95A1; text-align: right; margin-top: 4px; }
+    
+    /* [탭] */
+    .stTabs [data-baseweb="tab-list"] { gap: 8px; background-color: white; padding: 10px; border-radius: 12px; border: 1px solid #E5E8EB; }
+    .stTabs [data-baseweb="tab"] { height: 40px; border-radius: 8px; font-weight: 600; font-size: 14px; color: #4E5968; }
+    .stTabs [aria-selected="true"] { background-color: #F2F4F6 !important; color: #191F28 !important; }
+    .big-font { font-size: 32px; font-weight: 800; letter-spacing: -1px; }
+    </style>
+""", unsafe_allow_html=True)
         
         if raw_data:
             return json.loads(raw_data)
