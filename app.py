@@ -79,6 +79,13 @@ st.markdown("""
     <style>
     @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
 
+    /* [핵심 수정: Streamlit 기본 상단 여백 강제 제거] */
+    .block-container {
+        padding-top: 1rem !important; /* 기본 6rem -> 1rem으로 축소 */
+        padding-bottom: 0rem !important;
+        max-width: 100% !important;
+    }
+
     /* [Pull-to-Refresh 강력 차단] */
     html, body {
         overscroll-behavior: none !important;
@@ -96,8 +103,7 @@ st.markdown("""
         background-color: #F2F4F6; /* 전체 배경색 통일 */
     }
     header[data-testid="stHeader"] {
-        z-index: 1;
-        background-color: transparent !important;
+        display: none !important; /* 헤더 아예 숨김 처리 (더 확실하게 공간 확보) */
     }
 
     /* [전체 폰트 및 컬러] */
@@ -125,7 +131,7 @@ st.markdown("""
         border-radius: 24px;
         box-shadow: 0 10px 40px rgba(0,0,0,0.08);
         border: 1px solid #E5E8EB;
-        margin-top: 20px;
+        margin-top: 10px; /* 카드 상단 여백 축소 */
     }
     
     /* [버튼 스타일] */
