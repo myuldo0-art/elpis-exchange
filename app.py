@@ -74,7 +74,7 @@ def save_db():
 # --- [페이지 설정] ---
 st.set_page_config(layout="wide", page_title="ELPIS EXCHANGE", page_icon="📈")
 
-# --- [CSS 스타일 : 프리미엄 금융 앱 디자인 (원본 유지 및 메뉴 버튼 고도화)] ---
+# --- [CSS 스타일 : 프리미엄 금융 앱 디자인 (Master's Order 반영)] ---
 st.markdown("""
     <style>
     @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
@@ -206,47 +206,36 @@ st.markdown("""
     .chat-msg { font-size: 15px; color: #333D4B; line-height: 1.4; }
     .chat-time { font-size: 11px; color: #8B95A1; text-align: right; margin-top: 4px; }
     
-    /* [수정된 탭 메뉴 : 고급 버튼 시각화 디자인] */
-    .stTabs [data-baseweb="tab-list"] { 
-        gap: 12px; 
-        background-color: transparent; 
-        padding: 5px 0px; 
-        border-radius: 0px; 
-        border: none;
-        display: flex;
-        justify-content: flex-start;
+    /* [탭 버튼화 - Master's Instruction 적용] */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 12px !important;
+        background-color: transparent !important;
+        padding: 10px 0 !important;
+        border: none !important;
     }
-    .stTabs [data-baseweb="tab"] { 
-        height: 50px; 
-        min-width: 100px;
-        border-radius: 14px !important; 
-        background-color: white !important;
-        border: 1px solid #E5E8EB !important;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.04) !important;
-        font-weight: 700 !important; 
-        font-size: 18px !important; /* 폰트 크기 키움 */
-        color: #4E5968 !important;
-        padding: 0px 20px !important;
-        transition: all 0.25s ease;
+    .stTabs [data-baseweb="tab"] {
+        height: 65px !important; /* 버튼 높이 확대 */
+        border-radius: 16px !important;
+        font-weight: 800 !important; /* 굵게 */
+        font-size: 20px !important; /* 폰트 확대 */
+        color: #8B95A1 !important;
+        background-color: #FFFFFF !important;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.05) !important;
+        border: 1px solid #F2F4F6 !important;
+        flex-grow: 1 !important;
+        transition: all 0.2s ease !important;
     }
-    /* 탭 호버 시 효과 */
     .stTabs [data-baseweb="tab"]:hover {
         transform: translateY(-2px);
-        border-color: #3182F6 !important;
+        box-shadow: 0 6px 15px rgba(0,0,0,0.1) !important;
         color: #3182F6 !important;
     }
-    /* 활성화된 탭(버튼) 디자인 */
-    .stTabs [aria-selected="true"] { 
-        background-color: #3182F6 !important; 
-        color: white !important; 
-        border: 1px solid #3182F6 !important;
-        box-shadow: 0 4px 12px rgba(49, 130, 246, 0.3) !important;
+    .stTabs [aria-selected="true"] {
+        background-color: #3182F6 !important; /* 활성화 시 Toss Blue */
+        color: #FFFFFF !important;
+        box-shadow: 0 6px 16px rgba(49, 130, 246, 0.4) !important;
+        border: none !important;
     }
-    /* 탭 밑줄 제거 */
-    .stTabs [data-baseweb="tab-highlight"] {
-        display: none !important;
-    }
-
     .big-font { font-size: 32px; font-weight: 800; letter-spacing: -1px; }
     </style>
 """, unsafe_allow_html=True)
@@ -583,6 +572,7 @@ else:
             st.session_state['view_profile_id'] = None
             st.rerun()
     
+    # [탭 이름 수정 완료: Master's Order 반영]
     tabs = st.tabs(["메인화면", "관심", "현재가", "주문", "잔고", "내역", "거래소"])
 
     # [② 탭: 메인화면]
