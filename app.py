@@ -522,27 +522,26 @@ def mining():
         return False, 0
 
 # ==========================================
-# [앱 UI 시작] - 초기화면: 4시간마다 바뀌는 영감의 격언 (Master's Option 2: Dark & Gold)
+# [앱 UI 시작] - 초기화면: 컴팩트한 격언 배너 + 여백 제거 수정본 (최종)
 # ==========================================
 if not st.session_state['logged_in']:
-    # [레이아웃] 중앙 정렬
+    # [레이아웃] 중앙 정렬 (상단 여백 제거를 위해 spacer 조정)
     col_spacer1, col_center, col_spacer2 = st.columns([1, 6, 1])
     
     with col_center:
-        st.markdown("<div style='height: 40px;'></div>", unsafe_allow_html=True)
+        # [수정됨] 상단 강제 여백(height: 40px) 삭제하여 위로 당김
         
-        # [타이틀 섹션]
+        # [타이틀 섹션] - 마진 축소
         st.markdown("""
-            <div style='text-align: center; margin-bottom: 20px;'>
+            <div style='text-align: center; margin-bottom: 15px; margin-top: 20px;'>
                 <h1 style='color: #3182F6; font-size: 52px; font-weight: 900; letter-spacing: -2px; margin-bottom: 0;'>ELPIS</h1>
                 <h3 style='color: #191F28; font-size: 24px; font-weight: 700; letter-spacing: -0.5px; margin-top: 0;'>EXCHANGE</h3>
             </div>
         """, unsafe_allow_html=True)
 
         # --------------------------------------------------------------------------------
-        # [💡 추가된 기능: 4시간마다 바뀌는 '마스터의 격언']
+        # [기능] 4시간마다 바뀌는 '마스터의 격언' 로직 (그대로 유지)
         # --------------------------------------------------------------------------------
-        # 명언 데이터베이스 (부, 인간, 시간, 가치 관련)
         quotes_db = [
             ("가장 큰 위험은 아무런 위험도 감수하지 않는 것이다.", "마크 저커버그"),
             ("가격은 당신이 지불하는 것이고, 가치는 당신이 얻는 것이다.", "워렌 버핏"),
@@ -552,29 +551,21 @@ if not st.session_state['logged_in']:
             ("욕망은 인간을 움직이는 엔진이고, 희망은 그 엔진의 연료다.", "ELPIS Philosophy"),
             ("기회는 일어나는 것이 아니라, 만들어내는 것이다.", "크리스 그로서"),
             ("성공한 사람보다는 가치 있는 사람이 되려 노력하라.", "알베르트 아인슈타인"),
-            ("잠을 자면 꿈을 꾸지만, 꿈을 꾸면 잠이 온다? 아니, 꿈을 이루게 된다.", "ELPIS Motivation"), # 약간의 위트 포함
+            ("잠을 자면 꿈을 꾸지만, 꿈을 꾸면 잠이 온다? 아니, 꿈을 이루게 된다.", "ELPIS Motivation"),
             ("인내할 수 있는 사람은 그가 바라는 것은 무엇이든 손에 넣을 수 있다.", "벤저민 프랭클린")
         ]
         
-        # [핵심 로직] 현재 시간을 4시간(14400초) 단위로 나누어 시드(Seed)값 생성
-        # 이렇게 하면 전 세계 모든 사용자가 같은 4시간 동안은 같은 명언을 보게 됩니다.
         time_slot = int(time.time() / (4 * 3600)) 
         random.seed(time_slot) 
         today_quote, author = random.choice(quotes_db)
         
-        # [UI 출력] 격언 배너 디자인 (Option 2: Premium Dark & Gold)
-        # 배경: 깊은 차콜 블랙 (#191F28)
-        # 텍스트: 은은한 샴페인 골드 (#F4D03F)
+        # [수정됨] UI: 높이 최소화 (padding: 8px) / 폰트 최소화 (font-size: 12px)
         st.markdown(f"""
-            <div style='background-color: #191F28; padding: 24px; border-radius: 16px; margin-bottom: 24px; text-align: center; border: 1px solid rgba(244, 208, 63, 0.2); box-shadow: 0 4px 20px rgba(0,0,0,0.15);'>
-                <p style='color: #F4D03F; font-size: 17px; font-weight: 600; font-family: "Georgia", serif; font-style: italic; margin: 0; line-height: 1.6; letter-spacing: -0.2px;'>
-                    <span style='color: rgba(244, 208, 63, 0.5); font-size: 24px; vertical-align: -4px; margin-right: 4px;'>❝</span>
+            <div style='background-color: #FFFFFF; padding: 8px 16px; border-radius: 12px; margin-bottom: 20px; text-align: center; border: 1px solid #E5E8EB; box-shadow: 0 2px 6px rgba(0,0,0,0.03);'>
+                <p style='color: #4E5968; font-size: 12px; font-weight: 500; margin: 0; letter-spacing: -0.3px; line-height: 1.4;'>
+                    <span style='color: #FFC700; font-size: 14px; margin-right: 3px; vertical-align: -1px;'>❝</span>
                     {today_quote}
-                    <span style='color: rgba(244, 208, 63, 0.5); font-size: 24px; vertical-align: -4px; margin-left: 4px;'>❞</span>
-                </p>
-                <div style='width: 40px; height: 1px; background-color: rgba(244, 208, 63, 0.3); margin: 12px auto;'></div>
-                <p style='color: #8B95A1; font-size: 13px; margin-top: 0; font-weight: 400; letter-spacing: 1px; text-transform: uppercase;'>
-                    — {author} —
+                    <span style='color: #8B95A1; font-size: 11px; margin-left: 8px; font-weight: 400;'>— {author}</span>
                 </p>
             </div>
         """, unsafe_allow_html=True)
