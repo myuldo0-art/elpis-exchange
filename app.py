@@ -74,17 +74,16 @@ def save_db():
 # --- [페이지 설정] ---
 st.set_page_config(layout="wide", page_title="ELPIS EXCHANGE", page_icon="📈")
 
-# --- [CSS 스타일 : 프리미엄 금융 앱 디자인 (Master's Order 반영)] ---
+# --- [CSS 스타일 : 프리미엄 금융 앱 디자인 + 초기화면 UI 강화] ---
 st.markdown("""
     <style>
     @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
 
-    /* [Pull-to-Refresh 강력 차단 수정본] */
+    /* [Pull-to-Refresh 강력 차단] */
     html, body {
         overscroll-behavior: none !important;
         overscroll-behavior-y: none !important;
     }
-    /* Streamlit 메인 컨테이너 고정 및 스크롤 제어 */
     div[data-testid="stAppViewContainer"] {
         overscroll-behavior: none !important;
         overscroll-behavior-y: none !important;
@@ -93,14 +92,15 @@ st.markdown("""
         top: 0;
         width: 100%;
         height: 100%;
-        overflow-y: auto !important; /* 내부 스크롤은 허용하되 전체 페이지 당김 방지 */
+        overflow-y: auto !important;
+        background-color: #F2F4F6; /* 전체 배경색 통일 */
     }
-    /* 헤더 영역 터치 방지 */
     header[data-testid="stHeader"] {
         z-index: 1;
+        background-color: transparent !important;
     }
 
-    /* [전체 레이아웃] */
+    /* [전체 폰트 및 컬러] */
     html, body, .stApp {
         font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif !important;
         background-color: #F2F4F6;
@@ -116,6 +116,16 @@ st.markdown("""
         border-radius: 16px !important;
         padding: 15px !important;
         box-shadow: 0 2px 8px rgba(0,0,0,0.04) !important;
+    }
+    
+    /* [로그인/회원가입 카드 스타일] */
+    .auth-card {
+        background-color: #FFFFFF;
+        padding: 40px;
+        border-radius: 24px;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.08);
+        border: 1px solid #E5E8EB;
+        margin-top: 20px;
     }
     
     /* [버튼 스타일] */
@@ -235,6 +245,10 @@ st.markdown("""
         color: #FFFFFF !important;
         box-shadow: 0 6px 16px rgba(49, 130, 246, 0.4) !important;
         border: none !important;
+    }
+    /* [긴급 수정] 활성화된 탭 내부의 <p> 태그 텍스트 색상을 강제로 흰색으로 변경 */
+    .stTabs [aria-selected="true"] p {
+        color: #FFFFFF !important;
     }
     .big-font { font-size: 32px; font-weight: 800; letter-spacing: -1px; }
     </style>
@@ -511,44 +525,72 @@ def mining():
 # [앱 UI 시작]
 # ==========================================
 if not st.session_state['logged_in']:
-    st.markdown("<h1 style='text-align: center; color: #191F28; font-family: Pretendard;'>ELPIS EXCHANGE</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center; color: #8B95A1;'>욕망을 태워 희망을 거래하라</p>", unsafe_allow_html=True)
-    st.divider()
-
-    auth_tabs = st.tabs(["🔒 로그인", "📝 회원가입"])
-    with auth_tabs[0]: 
-        l_id = st.text_input("아이디", key="login_id")
-        l_pw = st.text_input("비밀번호", type="password", key="login_pw")
-        if st.button("접속하기", type="primary"):
-            # DB 로드 재확인
-            if not st.session_state['user_db']:
-                 st.session_state['user_db'] = load_db()['user_db']
-            
-            if l_id in st.session_state['user_db'] and st.session_state['user_db'][l_id] == l_pw:
-                st.session_state['logged_in'] = True
-                st.session_state['user_info']['id'] = l_id
-                sync_user_state(l_id)
-                st.rerun()
-            else:
-                st.error("정보가 일치하지 않습니다.")
-    with auth_tabs[1]:
-        r_name = st.text_input("실명")
-        r_rrn = st.text_input("주민등록번호 (앞 6자리)", max_chars=6)
-        r_phone = st.text_input("휴대폰 번호")
-        r_id = st.text_input("아이디", key="reg_id")
-        r_pw = st.text_input("비밀번호", type="password", key="reg_pw")
-        if st.button("가입하고 1,000만 이드 받기"):
-            if r_name and r_rrn and r_phone and r_id and r_pw:
-                if r_id in st.session_state['user_db']:
-                    st.warning("이미 존재하는 아이디입니다.")
+    # [초기화면 디자인 리뉴얼: High-End Financial Style]
+    # 중앙 정렬을 위한 여백 조정
+    col_spacer1, col_center, col_spacer2 = st.columns([1, 6, 1])
+    
+    with col_center:
+        st.markdown("<div style='height: 40px;'></div>", unsafe_allow_html=True) # 상단 여백
+        
+        # 타이틀 섹션 (HTML)
+        st.markdown("""
+            <div style='text-align: center; margin-bottom: 20px;'>
+                <h1 style='color: #3182F6; font-size: 52px; font-weight: 900; letter-spacing: -2px; margin-bottom: 0;'>ELPIS</h1>
+                <h3 style='color: #191F28; font-size: 24px; font-weight: 700; letter-spacing: -0.5px; margin-top: 0;'>EXCHANGE</h3>
+                <p style='color: #8B95A1; font-size: 17px; margin-top: 12px; font-weight: 500;'>
+                    모든 인간은 하나의 상장 기업이다.<br>
+                    당신의 가치를 거래하세요.
+                </p>
+            </div>
+        """, unsafe_allow_html=True)
+        
+        # 카드 UI 내부로 탭 이동
+        st.markdown("<div class='auth-card'>", unsafe_allow_html=True)
+        
+        auth_tabs = st.tabs(["🔒 로그인", "📝 회원가입"])
+        
+        with auth_tabs[0]: 
+            st.markdown("<br>", unsafe_allow_html=True)
+            l_id = st.text_input("아이디", key="login_id", placeholder="ID를 입력하세요")
+            l_pw = st.text_input("비밀번호", type="password", key="login_pw", placeholder="비밀번호를 입력하세요")
+            st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+            if st.button("ELPIS 시작하기", type="primary"):
+                # DB 로드 재확인
+                if not st.session_state['user_db']:
+                     st.session_state['user_db'] = load_db()['user_db']
+                
+                if l_id in st.session_state['user_db'] and st.session_state['user_db'][l_id] == l_pw:
+                    st.session_state['logged_in'] = True
+                    st.session_state['user_info']['id'] = l_id
+                    sync_user_state(l_id)
+                    st.rerun()
                 else:
-                    st.session_state['user_db'][r_id] = r_pw
-                    st.session_state['user_names'][r_id] = r_name
-                    sync_user_state(r_id) 
-                    save_current_user_state(r_id)
-                    st.success("가입 완료!")
-            else:
-                st.warning("정보를 입력하세요.")
+                    st.error("계정 정보가 일치하지 않습니다.")
+                    
+        with auth_tabs[1]:
+            st.markdown("<br>", unsafe_allow_html=True)
+            r_name = st.text_input("실명", placeholder="본명을 입력하세요")
+            r_rrn = st.text_input("주민등록번호 (앞 6자리)", max_chars=6, placeholder="YYMMDD")
+            r_phone = st.text_input("휴대폰 번호", placeholder="010-0000-0000")
+            r_id = st.text_input("아이디", key="reg_id", placeholder="사용할 ID")
+            r_pw = st.text_input("비밀번호", type="password", key="reg_pw", placeholder="비밀번호")
+            st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+            
+            if st.button("가입하고 1,000만 이드(ID) 받기", type="primary"):
+                if r_name and r_rrn and r_phone and r_id and r_pw:
+                    if r_id in st.session_state['user_db']:
+                        st.warning("이미 사용 중인 아이디입니다.")
+                    else:
+                        st.session_state['user_db'][r_id] = r_pw
+                        st.session_state['user_names'][r_id] = r_name
+                        sync_user_state(r_id) 
+                        save_current_user_state(r_id)
+                        st.success("환영합니다! 가입이 완료되었습니다.")
+                else:
+                    st.warning("모든 정보를 정확히 입력해주세요.")
+        
+        st.markdown("</div>", unsafe_allow_html=True) # auth-card 닫기
+        st.markdown("<div style='text-align: center; margin-top: 30px; color: #B0B8C1; font-size: 12px;'>© 2026 ELPIS EXCHANGE. All rights reserved.</div>", unsafe_allow_html=True)
 
 else:
     user_id = st.session_state['user_info'].get('id', 'Guest')
