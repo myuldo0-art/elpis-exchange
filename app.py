@@ -35,6 +35,7 @@ def load_db():
         # A1 셀의 데이터를 가져옴 (매우 긴 텍스트)
         raw_data = worksheet.acell('A1').value
         
+        # [교정 완료] 불필요한 들여쓰기를 제거하여 오류를 해결했습니다.
         if raw_data:
             return json.loads(raw_data)
         return None
