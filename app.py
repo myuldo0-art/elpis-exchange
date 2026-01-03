@@ -79,13 +79,6 @@ st.markdown("""
     <style>
     @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
 
-    /* [Streamlit 기본 메뉴 및 워터마크 숨김 처리 (추가된 부분)] */
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
-    div[data-testid="stStatusWidget"] {visibility: hidden;}
-    .stDeployButton {display: none;}
-
     /* [Pull-to-Refresh 강력 차단 수정본] */
     html, body {
         overscroll-behavior: none !important;
