@@ -17,14 +17,13 @@ def init_connection():
         "https://www.googleapis.com/auth/spreadsheets",
         "https://www.googleapis.com/auth/drive",
     ]
+    # secrets가 없는 로컬 환경 등을 대비한 예외처리는 생략(마스터의 환경 신뢰)
     credentials_dict = st.secrets["gcp_service_account"]
     creds = Credentials.from_service_account_info(credentials_dict, scopes=scope)
     client = gspread.authorize(creds)
     return client
 
 # --- [데이터 영구 저장 시스템 : 구글 시트 버전] ---
-# 복잡한 객체 구조를 유지하기 위해 JSON String 형태로 시트 A1 셀에 통째로 저장/로드합니다.
-
 def load_db():
     """구글 시트에서 전체 데이터를 JSON으로 불러옴"""
     try:
@@ -39,13 +38,11 @@ def load_db():
             return json.loads(raw_data)
         return None
     except Exception as e:
-        # DB가 비어있거나 연결 실패 시 None 반환 -> 초기화 로직으로 이동
         print(f"DB Load Error: {e}")
         return None
 
 def save_db():
     """현재 session_state의 핵심 데이터를 구글 시트에 백업"""
-    # 저장할 데이터 추출
     data = {
         'user_db': st.session_state['user_db'],
         'user_names': st.session_state['user_names'],
@@ -61,57 +58,61 @@ def save_db():
         client = init_connection()
         sh = client.open("ELPIS_DB")
         worksheet = sh.worksheet("JSON_DATA")
-        
-        # 데이터를 JSON 문자열로 변환
         json_str = json.dumps(data, ensure_ascii=False)
-        
-        # A1 셀에 덮어쓰기
         worksheet.update_acell('A1', json_str)
         
     except Exception as e:
-        st.error(f"데이터 저장 실패 (네트워크 문제일 수 있음): {e}")
+        st.error(f"데이터 저장 실패: {e}")
 
 # --- [페이지 설정] ---
 st.set_page_config(layout="wide", page_title="ELPIS EXCHANGE", page_icon="📈")
 
-# --- [CSS 스타일 : 프리미엄 금융 앱 디자인 + 초기화면 UI 강화] ---
+# --- [CSS 스타일 : 모바일 최적화 패치 적용 완료] ---
 st.markdown("""
     <style>
     @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
 
-    /* [핵심 수정: Streamlit 기본 상단 여백 강제 제거] */
+    /* [기본 레이아웃] */
     .block-container {
-        padding-top: 1rem !important; /* 기본 6rem -> 1rem으로 축소 */
+        padding-top: 1rem !important; 
         padding-bottom: 0rem !important;
         max-width: 100% !important;
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
     }
-
-    /* [Pull-to-Refresh 강력 차단] */
-    html, body {
-        overscroll-behavior: none !important;
-        overscroll-behavior-y: none !important;
-    }
-    div[data-testid="stAppViewContainer"] {
-        overscroll-behavior: none !important;
-        overscroll-behavior-y: none !important;
-        position: fixed !important;
-        left: 0;
-        top: 0;
-        width: 100%;
-        height: 100%;
-        overflow-y: auto !important;
-        background-color: #F2F4F6; /* 전체 배경색 통일 */
-    }
-    header[data-testid="stHeader"] {
-        display: none !important; /* 헤더 아예 숨김 처리 (더 확실하게 공간 확보) */
-    }
-
-    /* [전체 폰트 및 컬러] */
+    
+    /* [가로 스크롤 및 당겨서 새로고침 방지] */
     html, body, .stApp {
-        font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif !important;
+        font-family: 'Pretendard', sans-serif !important;
         background-color: #F2F4F6;
         color: #191F28;
+        overscroll-behavior: none !important;
+        overflow-x: hidden !important; /* 가로 스크롤 강제 차단 */
     }
+    header[data-testid="stHeader"] { display: none !important; }
+
+    /* [핵심: 모바일 반응형 다이어트 패치] */
+    @media (max-width: 640px) {
+        /* 컬럼 간격 강제 제거 (기본 16px -> 2px) */
+        div[data-testid="stHorizontalBlock"] {
+            gap: 2px !important; 
+        }
+        /* 컬럼 패딩 제거 */
+        div[data-testid="column"] {
+            min-width: 0px !important;
+            flex: 1 !important;
+            padding: 0 !important;
+        }
+        /* 버튼 여백 및 폰트 축소 */
+        .stButton > button {
+            padding-left: 2px !important;
+            padding-right: 2px !important;
+            font-size: 12px !important;
+            height: 42px !important;
+            min-width: 0px !important;
+        }
+    }
+
     .main { background-color: #F2F4F6; }
     
     /* [카드 디자인] */
@@ -124,23 +125,23 @@ st.markdown("""
         box-shadow: 0 2px 8px rgba(0,0,0,0.04) !important;
     }
     
-    /* [로그인/회원가입 카드 스타일] */
+    /* [로그인 카드] */
     .auth-card {
         background-color: #FFFFFF;
-        padding: 40px;
+        padding: 30px 20px; /* 모바일 대응 패딩 축소 */
         border-radius: 24px;
         box-shadow: 0 10px 40px rgba(0,0,0,0.08);
         border: 1px solid #E5E8EB;
-        margin-top: 10px; /* 카드 상단 여백 축소 */
+        margin-top: 10px;
     }
     
-    /* [버튼 스타일] */
+    /* [공통 버튼] */
     .stButton>button {
         width: 100%;
         border-radius: 12px !important;
         font-weight: 600 !important;
-        height: 52px !important;
-        font-size: 16px !important;
+        height: 52px; /* 데스크탑 기본 */
+        font-size: 16px;
         border: none !important;
         transition: all 0.2s ease;
         box-shadow: 0 2px 4px rgba(0,0,0,0.05);
@@ -163,11 +164,10 @@ st.markdown("""
         box-shadow: 0 0 0 2px rgba(49, 130, 246, 0.2) !important;
     }
 
-    /* [텍스트 컬러] */
+    /* [유틸리티 클래스] */
     .up-text { color: #E22A2A !important; font-weight: 700; }
     .down-text { color: #2A6BE2 !important; font-weight: 700; }
     .flat-text { color: #333333 !important; font-weight: 700; }
-    .small-gray { font-size: 13px; color: #8B95A1; margin-top: 2px; }
     
     /* [프로필 카드] */
     .profile-card {
@@ -179,8 +179,6 @@ st.markdown("""
         margin-bottom: 20px;
         border: 1px solid #F2F4F6;
     }
-    .profile-card h2 { margin: 0; font-size: 22px; color: #191F28; }
-    .profile-card p { color: #4E5968; font-size: 14px; margin: 8px 0; }
     
     /* [호가창] */
     .hoga-container {
@@ -222,18 +220,18 @@ st.markdown("""
     .chat-msg { font-size: 15px; color: #333D4B; line-height: 1.4; }
     .chat-time { font-size: 11px; color: #8B95A1; text-align: right; margin-top: 4px; }
     
-    /* [탭 버튼화 - Master's Instruction 적용] */
+    /* [탭 버튼 스타일] */
     .stTabs [data-baseweb="tab-list"] {
-        gap: 12px !important;
+        gap: 8px !important;
         background-color: transparent !important;
         padding: 10px 0 !important;
         border: none !important;
     }
     .stTabs [data-baseweb="tab"] {
-        height: 65px !important; /* 버튼 높이 확대 */
+        height: 55px !important;
         border-radius: 16px !important;
-        font-weight: 800 !important; /* 굵게 */
-        font-size: 20px !important; /* 폰트 확대 */
+        font-weight: 800 !important;
+        font-size: 18px !important;
         color: #8B95A1 !important;
         background-color: #FFFFFF !important;
         box-shadow: 0 4px 10px rgba(0,0,0,0.05) !important;
@@ -241,18 +239,12 @@ st.markdown("""
         flex-grow: 1 !important;
         transition: all 0.2s ease !important;
     }
-    .stTabs [data-baseweb="tab"]:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 15px rgba(0,0,0,0.1) !important;
-        color: #3182F6 !important;
-    }
     .stTabs [aria-selected="true"] {
-        background-color: #3182F6 !important; /* 활성화 시 Toss Blue */
+        background-color: #3182F6 !important; 
         color: #FFFFFF !important;
         box-shadow: 0 6px 16px rgba(49, 130, 246, 0.4) !important;
         border: none !important;
     }
-    /* [긴급 수정] 활성화된 탭 내부의 <p> 태그 텍스트 색상을 강제로 흰색으로 변경 */
     .stTabs [aria-selected="true"] p {
         color: #FFFFFF !important;
     }
@@ -281,7 +273,7 @@ if 'initialized' not in st.session_state:
         st.session_state['pending_orders'] = saved_data.get('pending_orders', [])
         st.session_state['interested_codes'] = set(saved_data.get('interested_codes', ['IU', 'G_DRAGON', 'ELON', 'DEV_MASTER']))
     else:
-        # [초기 데이터 생성 - DB가 비어있을 때 최초 1회 실행]
+        # [초기 데이터 생성]
         st.session_state['user_db'] = {'test': '1234'} 
         st.session_state['user_names'] = {'test': '테스터'}
         st.session_state['user_states'] = {
@@ -302,17 +294,9 @@ if 'initialized' not in st.session_state:
         }
         
         # 봇 생성 로직
-        bot_profiles = [
-            ("김철수", "경제적 자유", "instagram.com/chulsoo"),
-            ("이영희", "건물주 목표", "youtube.com/younghee"),
-            ("박민수", "100억 자산가", "blog.naver.com/minsu"),
-            # ... (나머지 봇들 생략 가능하나 원본 유지를 위해 3개만 예시, 원하면 추가하세요)
-        ]
-        
-        for i in range(5): # 예시로 5명만 생성 (속도 최적화)
+        for i in range(5):
             bot_id = f"pppp{i+1}" 
             name = f"Bot_{i+1}"
-            
             st.session_state['user_db'][bot_id] = '1234'
             st.session_state['user_names'][bot_id] = name
             st.session_state['user_states'][bot_id] = {
@@ -343,7 +327,6 @@ if 'initialized' not in st.session_state:
 
 
 # --- [헬퍼 함수] ---
-
 def sync_user_state(user_id):
     if user_id not in st.session_state['user_states']:
         st.session_state['user_states'][user_id] = {
@@ -368,12 +351,9 @@ def save_current_user_state(user_id):
         'my_profile': st.session_state['my_profile'],
         'last_mining_time': st.session_state['last_mining_time']
     }
-    # 사진 데이터는 JSON 저장이 어려우므로 제외 (실제 배포시엔 S3 등 필요)
     temp_profile = st.session_state['my_profile'].copy()
     temp_profile['photo'] = None 
     st.session_state['user_states'][user_id]['my_profile'] = temp_profile
-    
-    # [중요] 상태 변경 시 구글 시트에 저장
     save_db()
 
 def update_price_match(market_code, price):
@@ -382,8 +362,7 @@ def update_price_match(market_code, price):
     market['change'] = round(((price - market['history'][0]) / market['history'][0]) * 100, 2)
     market['history'].append(price)
 
-# --- [리얼 매칭 엔진] ---
-
+# --- [매칭 엔진] ---
 def place_order(type, code, price, qty):
     market = st.session_state['market_data'][code]
     user_id = st.session_state['user_info']['id']
@@ -528,16 +507,12 @@ def mining():
         return False, 0
 
 # ==========================================
-# [앱 UI 시작] - 초기화면: 컴팩트한 격언 배너 + 여백 제거 수정본 (최종)
+# [앱 UI 시작]
 # ==========================================
 if not st.session_state['logged_in']:
-    # [레이아웃] 중앙 정렬 (상단 여백 제거를 위해 spacer 조정)
     col_spacer1, col_center, col_spacer2 = st.columns([1, 6, 1])
     
     with col_center:
-        # [수정됨] 상단 강제 여백(height: 40px) 삭제하여 위로 당김
-        
-        # [타이틀 섹션] - 마진 축소
         st.markdown("""
             <div style='text-align: center; margin-bottom: 15px; margin-top: 20px;'>
                 <h1 style='color: #3182F6; font-size: 52px; font-weight: 900; letter-spacing: -2px; margin-bottom: 0;'>ELPIS</h1>
@@ -545,9 +520,6 @@ if not st.session_state['logged_in']:
             </div>
         """, unsafe_allow_html=True)
 
-        # --------------------------------------------------------------------------------
-        # [기능] 4시간마다 바뀌는 '마스터의 격언' 로직 (그대로 유지)
-        # --------------------------------------------------------------------------------
         quotes_db = [
             ("가장 큰 위험은 아무런 위험도 감수하지 않는 것이다.", "마크 저커버그"),
             ("가격은 당신이 지불하는 것이고, 가치는 당신이 얻는 것이다.", "워렌 버핏"),
@@ -565,7 +537,6 @@ if not st.session_state['logged_in']:
         random.seed(time_slot) 
         today_quote, author = random.choice(quotes_db)
         
-        # [수정됨] UI: 높이 최소화 (padding: 8px) / 폰트 최소화 (font-size: 12px)
         st.markdown(f"""
             <div style='background-color: #FFFFFF; padding: 8px 16px; border-radius: 12px; margin-bottom: 20px; text-align: center; border: 1px solid #E5E8EB; box-shadow: 0 2px 6px rgba(0,0,0,0.03);'>
                 <p style='color: #4E5968; font-size: 12px; font-weight: 500; margin: 0; letter-spacing: -0.3px; line-height: 1.4;'>
@@ -575,11 +546,8 @@ if not st.session_state['logged_in']:
                 </p>
             </div>
         """, unsafe_allow_html=True)
-        # --------------------------------------------------------------------------------
         
-        # [카드 UI 시작]
         st.markdown("<div class='auth-card'>", unsafe_allow_html=True)
-        
         auth_tabs = st.tabs(["🔒 로그인", "📝 회원가입"])
         
         with auth_tabs[0]: 
@@ -588,10 +556,8 @@ if not st.session_state['logged_in']:
             l_pw = st.text_input("비밀번호", type="password", key="login_pw", placeholder="비밀번호를 입력하세요")
             st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
             if st.button("ELPIS 시작하기", type="primary"):
-                # DB 로드 재확인
                 if not st.session_state['user_db']:
                      st.session_state['user_db'] = load_db()['user_db']
-                
                 if l_id in st.session_state['user_db'] and st.session_state['user_db'][l_id] == l_pw:
                     st.session_state['logged_in'] = True
                     st.session_state['user_info']['id'] = l_id
@@ -608,7 +574,6 @@ if not st.session_state['logged_in']:
             r_id = st.text_input("아이디", key="reg_id", placeholder="사용할 ID")
             r_pw = st.text_input("비밀번호", type="password", key="reg_pw", placeholder="비밀번호")
             st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
-            
             if st.button("가입하고 1,000만 이드(ID) 받기", type="primary"):
                 if r_name and r_rrn and r_phone and r_id and r_pw:
                     if r_id in st.session_state['user_db']:
@@ -622,14 +587,13 @@ if not st.session_state['logged_in']:
                 else:
                     st.warning("모든 정보를 정확히 입력해주세요.")
         
-        st.markdown("</div>", unsafe_allow_html=True) # 카드 닫기
+        st.markdown("</div>", unsafe_allow_html=True) 
         st.markdown("<div style='text-align: center; margin-top: 30px; color: #B0B8C1; font-size: 12px;'>© 2026 ELPIS EXCHANGE. All rights reserved.</div>", unsafe_allow_html=True)
 
 else:
     user_id = st.session_state['user_info'].get('id', 'Guest')
     user_name = st.session_state['user_names'].get(user_id, '사용자')
     
-    # [프로필 모달]
     if st.session_state.get('view_profile_id'):
         target_id = st.session_state['view_profile_id']
         target_name = st.session_state['user_names'].get(target_id, target_id)
@@ -647,16 +611,14 @@ else:
             st.session_state['view_profile_id'] = None
             st.rerun()
     
-    # [탭 이름 수정 완료: Master's Order 반영]
     tabs = st.tabs(["메인화면", "관심", "현재가", "주문", "잔고", "내역", "거래소"])
 
-    # [② 탭: 메인화면]
+    # [① 탭: 메인화면]
     with tabs[0]:
         with st.container():
             st.markdown(f"<div style='text-align:center;'>", unsafe_allow_html=True)
             col_img1, col_img2, col_img3 = st.columns([1,1,1])
             with col_img2: 
-                # 사진 업로드 기능은 로컬 파일 시스템 의존이므로 시각적으로만 표시 (DB저장 X)
                 uploaded_file = st.file_uploader("사진", type=['jpg', 'png'], key="profile_upload", label_visibility="collapsed")
                 if uploaded_file is not None:
                      st.image(uploaded_file, width=120) 
@@ -700,116 +662,62 @@ else:
         st.divider()
         st.subheader(f"📨 {user_name}님에게 남겨진 메시지")
         my_messages = [m for m in st.session_state['board_messages'] if m['code'] == user_id]
-        
         if my_messages:
             for m in my_messages:
                 st.markdown(f"<div class='chat-box'><div class='chat-user'>{m['user']} <span style='font-weight:normal; color:#888;'>님이 작성</span></div><div class='chat-msg'>{m['msg']}</div><div class='chat-time'>{m['time']}</div></div>", unsafe_allow_html=True)
         else:
             st.info("아직 도착한 메시지가 없습니다.")
 
-    # [② 탭: 관심] (모바일 강제 가로 정렬 CSS 적용)
+    # [② 탭: 관심] (모바일 패치 적용 완료)
     with tabs[1]:
-        # [CSS Patch] 모바일 화면(폭 640px 이하)에서 강제 가로 정렬
-        st.markdown("""
-        <style>
-        @media (max-width: 640px) {
-            div[data-testid="stHorizontalBlock"] {
-                flex-direction: row !important;
-                flex-wrap: nowrap !important;
-            }
-            div[data-testid="column"] {
-                flex: 1 !important;
-                min-width: 0 !important; /* 내용물이 커도 강제로 줄임 */
-            }
-            /* 버튼 패딩 축소 */
-            .stButton > button {
-                padding: 0rem 0.2rem !important;
-                font-size: 11px !important; 
-                height: 35px !important;
-            }
-        }
-        </style>
-        """, unsafe_allow_html=True)
+        st.markdown("<h4 style='margin-bottom: 15px; font-weight: 800;'>관심 종목</h4>", unsafe_allow_html=True)
 
-        # 1. 헤더
-        st.markdown("<h4 style='margin-bottom: 10px; font-weight: 800;'>관심 종목</h4>", unsafe_allow_html=True)
-
-        # 2. 리스트 헤더
-        # 비율: 종목(3.5) : 현재가(3) : 등락(2.5) : 삭제(1)
-        h1, h2, h3, h4 = st.columns([3.5, 3, 2.5, 1])
-        h1.markdown("<span style='color:#8B95A1; font-size:12px; padding-left:2px;'>종목</span>", unsafe_allow_html=True)
+        # 리스트 헤더 (비율 조정 & gap="small")
+        h1, h2, h3, h4 = st.columns([4, 3, 2, 1], gap="small")
+        h1.markdown("<span style='color:#8B95A1; font-size:12px; padding-left:4px;'>종목명</span>", unsafe_allow_html=True)
         h2.markdown("<span style='color:#8B95A1; font-size:12px; display:block; text-align:right;'>현재가</span>", unsafe_allow_html=True)
         h3.markdown("<span style='color:#8B95A1; font-size:12px; display:block; text-align:right;'>등락</span>", unsafe_allow_html=True)
-        h4.markdown("") 
         st.markdown("<hr style='margin: 5px 0 0 0; border: 0; border-top: 1px solid #E5E8EB;'>", unsafe_allow_html=True)
 
-        # 3. 데이터 로드
         targets = list(st.session_state['interested_codes'])
-        targets = [t for t in targets if t != user_id] 
+        targets = [t for t in targets if t != user_id]
 
         if not targets:
             st.markdown("<div style='text-align:center; padding: 40px 0; color:#8B95A1; font-size:13px;'>관심 종목이 없습니다.</div>", unsafe_allow_html=True)
 
-        # 4. 리스트 출력 루프
         for code in targets:
             if code in st.session_state['market_data']:
                 info = st.session_state['market_data'][code]
                 c_price = info['price']
                 c_change = info['change']
 
-                # 색상 설정
                 if c_change > 0:
-                    color = "#E22A2A"
-                    bg_color = "rgba(226, 42, 42, 0.1)"
-                    arrow = "▲"
+                    color = "#E22A2A"; bg_color = "rgba(226, 42, 42, 0.1)"; arrow = "▲"
                 elif c_change < 0:
-                    color = "#2A6BE2"
-                    bg_color = "rgba(42, 107, 226, 0.1)"
-                    arrow = "▼"
+                    color = "#2A6BE2"; bg_color = "rgba(42, 107, 226, 0.1)"; arrow = "▼"
                 else:
-                    color = "#333333"
-                    bg_color = "rgba(51, 51, 51, 0.1)"
-                    arrow = "-"
+                    color = "#333333"; bg_color = "rgba(51, 51, 51, 0.1)"; arrow = "-"
 
-                # [카드형 리스트 레이아웃]
                 with st.container():
-                    st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
-                    
-                    # [핵심] 컬럼 비율을 모바일에 맞춰 타이트하게 잡음
-                    r1, r2, r3, r4 = st.columns([3.5, 3, 2.5, 1])
+                    st.markdown("<div style='height: 6px;'></div>", unsafe_allow_html=True)
+                    r1, r2, r3, r4 = st.columns([4, 3, 2, 1], gap="small")
 
-                    # Col 1: 종목명 (버튼)
                     with r1:
                         if st.button(f"{info['name']}", key=f"fav_btn_{code}", type="secondary", use_container_width=True):
-                            st.session_state['view_profile_id'] = code 
-                            st.rerun() 
-                    
-                    # Col 2: 현재가 (폰트 사이즈 조절, 줄바꿈 방지)
+                            st.session_state['view_profile_id'] = code
+                            st.rerun()
                     with r2:
-                        st.markdown(f"""
-                            <div style='text-align:right; padding-top: 8px; font-weight:700; font-size:14px; color:{color}; white-space: nowrap;'>
-                                {c_price:,}
-                            </div>
-                        """, unsafe_allow_html=True)
-
-                    # Col 3: 등락률 (뱃지, 줄바꿈 방지)
+                        st.markdown(f"<div style='text-align:right; padding-top: 10px; font-weight:700; font-size:13px; color:{color}; letter-spacing:-0.5px;'>{c_price:,}</div>", unsafe_allow_html=True)
                     with r3:
-                        st.markdown(f"""
-                            <div style='margin-top: 6px; float:right; background-color: {bg_color}; color: {color}; padding: 3px 6px; border-radius: 6px; font-size: 11px; font-weight: 600; white-space: nowrap;'>
-                                {arrow} {abs(c_change)}%
-                            </div>
-                        """, unsafe_allow_html=True)
-
-                    # Col 4: 삭제 버튼 (여백 없이 딱 붙임)
+                        st.markdown(f"<div style='margin-top: 8px; float:right; background-color: {bg_color}; color: {color}; padding: 2px 4px; border-radius: 4px; font-size: 11px; font-weight: 600; white-space: nowrap;'>{abs(c_change)}%</div>", unsafe_allow_html=True)
                     with r4:
                         if st.button("✕", key=f"del_{code}"): 
                             st.session_state['interested_codes'].remove(code)
                             save_db()
                             st.rerun()
+                    st.markdown("<hr style='margin: 6px 0 0 0; border: 0; border-top: 1px solid #F2F4F6;'>", unsafe_allow_html=True)
 
-                    st.markdown("<hr style='margin: 8px 0 0 0; border: 0; border-top: 1px solid #F2F4F6;'>", unsafe_allow_html=True)
-
-    # [④ 탭: 현재가]
+    # [③ 탭: 현재가]
     with tabs[2]:
         col_s1, col_s2 = st.columns([3, 1])
         search_q = col_s1.text_input("검색 (ID/이름)", placeholder="종목 검색...", label_visibility="collapsed")
@@ -837,48 +745,32 @@ else:
         pc2.markdown(f"<div class='{color_cls}' style='text-align:right; font-size:18px'>{change_pct}%</div>", unsafe_allow_html=True)
         
         pending_orders = [o for o in st.session_state['pending_orders'] if o['code'] == target]
-        
         buy_book = {} 
         sell_book = {} 
-        
         for o in pending_orders:
-            if o['type'] == 'BUY':
-                buy_book[o['price']] = buy_book.get(o['price'], 0) + o['qty']
-            elif o['type'] == 'SELL':
-                sell_book[o['price']] = sell_book.get(o['price'], 0) + o['qty']
+            if o['type'] == 'BUY': buy_book[o['price']] = buy_book.get(o['price'], 0) + o['qty']
+            elif o['type'] == 'SELL': sell_book[o['price']] = sell_book.get(o['price'], 0) + o['qty']
         
         best_asks = sorted(sell_book.items(), key=lambda x: x[0])[:5] 
         best_asks.sort(key=lambda x: x[0], reverse=True)
         best_bids = sorted(buy_book.items(), key=lambda x: x[0], reverse=True)[:5]
 
         hoga_html = "<div class='hoga-container'>"
-        
         sell_rows = []
-        for p, q in best_asks:
-            sell_rows.append((p, q))
-        while len(sell_rows) < 5:
-            sell_rows.insert(0, (None, None)) 
-            
+        for p, q in best_asks: sell_rows.append((p, q))
+        while len(sell_rows) < 5: sell_rows.insert(0, (None, None)) 
         for p, q in sell_rows:
-            if p:
-                hoga_html += f"<div class='hoga-row sell-bg'><div class='cell-vol'>{q:,}</div><div class='cell-price price-down'>{p:,}</div><div class='cell-empty'></div></div>"
-            else:
-                hoga_html += f"<div class='hoga-row sell-bg'><div class='cell-vol'></div><div class='cell-price'></div><div class='cell-empty'></div></div>"
-            
+            if p: hoga_html += f"<div class='hoga-row sell-bg'><div class='cell-vol'>{q:,}</div><div class='cell-price price-down'>{p:,}</div><div class='cell-empty'></div></div>"
+            else: hoga_html += f"<div class='hoga-row sell-bg'><div class='cell-vol'></div><div class='cell-price'></div><div class='cell-empty'></div></div>"
+        
         hoga_html += f"<div class='hoga-row'><div class='cell-vol'></div><div class='cell-price {color_cls} current-price-box'>{curr_price:,}</div><div class='cell-empty'></div></div>"
         
         buy_rows = []
-        for p, q in best_bids:
-            buy_rows.append((p, q))
-        while len(buy_rows) < 5:
-            buy_rows.append((None, None))
-            
+        for p, q in best_bids: buy_rows.append((p, q))
+        while len(buy_rows) < 5: buy_rows.append((None, None))
         for p, q in buy_rows:
-            if p:
-                hoga_html += f"<div class='hoga-row buy-bg'><div class='cell-empty'></div><div class='cell-price price-up'>{p:,}</div><div class='cell-vol-buy'>{q:,}</div></div>"
-            else:
-                 hoga_html += f"<div class='hoga-row buy-bg'><div class='cell-empty'></div><div class='cell-price'></div><div class='cell-vol-buy'></div></div>"
-            
+            if p: hoga_html += f"<div class='hoga-row buy-bg'><div class='cell-empty'></div><div class='cell-price price-up'>{p:,}</div><div class='cell-vol-buy'>{q:,}</div></div>"
+            else: hoga_html += f"<div class='hoga-row buy-bg'><div class='cell-empty'></div><div class='cell-price'></div><div class='cell-vol-buy'></div></div>"
         hoga_html += "</div>"
         st.markdown(hoga_html, unsafe_allow_html=True)
 
@@ -889,7 +781,7 @@ else:
             st.plotly_chart(fig, use_container_width=True, config={'staticPlot': False, 'displayModeBar': False})
 
         st.divider()
-        st.subheader(f"💬 {market['name']} 토론방 (방명록)")
+        st.subheader(f"💬 {market['name']} 토론방")
         with st.form(key='msg_form', clear_on_submit=True):
             user_msg = st.text_input("메시지", placeholder="응원/방명록 남기기")
             if st.form_submit_button("등록", type="primary") and user_msg:
@@ -902,7 +794,7 @@ else:
                 st.markdown(f"<div class='chat-box'><div class='chat-user'>{m['user']}</div><div class='chat-msg'>{m['msg']}</div><div class='chat-time'>{m['time']}</div></div>", unsafe_allow_html=True)
         st.markdown("</div>", unsafe_allow_html=True)
 
-    # [⑤ 탭: 주문]
+    # [④ 탭: 주문]
     with tabs[3]:
         target = st.session_state['selected_code']
         market = st.session_state['market_data'][target]
@@ -916,16 +808,14 @@ else:
             st.markdown(f"#### 가용: <span style='color:#3182F6'>{st.session_state['balance_id']:,.0f} ID</span>", unsafe_allow_html=True)
             buy_price = st.number_input("매수 희망가 (ID)", value=market['price'], step=100, key="buy_price_main")
             buy_qty = st.number_input("매수 수량 (주)", value=10, step=1, key="buy_qty_main")
-            
             if st.button("🔴 매수 주문 전송", type="primary"):
                 ok, msg = place_order('BUY', target, buy_price, buy_qty)
                 if ok: st.success(msg); time.sleep(1); st.rerun()
                 else: st.error(msg)
 
-    # [⑥ 탭: 잔고]
+    # [⑤ 탭: 잔고]
     with tabs[4]:
         st.subheader("💼 잔고 및 매도")
-        
         with st.expander("📢 내 엘피스 상장 (IPO)", expanded=True):
             locked = st.session_state['my_elpis_locked']
             st.markdown(f"**보유(Lock): {locked:,} 주**")
@@ -939,19 +829,15 @@ else:
                         st.session_state['market_data'][user_id]['price'] = ipo_price
                     else:
                         st.session_state['market_data'][user_id] = {'name': user_id, 'price': ipo_price, 'change': 0.0, 'desc': '신규 상장', 'history': [ipo_price]}
-                    
                     st.session_state['pending_orders'].append({'code': user_id, 'type': 'SELL', 'price': ipo_price, 'qty': ipo_qty, 'user': user_id})
-                    
                     st.session_state['interested_codes'].add(user_id)
                     save_current_user_state(user_id) 
-                    st.success("상장 주문 등록 완료! (매수자가 나타나면 체결됩니다)"); time.sleep(1.5); st.rerun()
-                else:
-                    st.error("보유 수량이 부족합니다.")
+                    st.success("상장 주문 완료"); time.sleep(1.5); st.rerun()
+                else: st.error("수량 부족")
         
         st.divider()
-
         if not st.session_state['portfolio']: 
-            st.info("보유 중인 주식이 없습니다.")
+            st.info("보유 주식 없음")
         else:
             for code, info in st.session_state['portfolio'].items():
                 curr_p = st.session_state['market_data'][code]['price']
@@ -963,9 +849,8 @@ else:
                     if st.button(f"{st.session_state['market_data'][code]['name']} ({code})", key=f"pf_n_{code}", type="secondary"):
                         st.session_state['view_profile_id'] = code
                         st.rerun()
-                        
                     col_info1, col_info2, col_info3 = st.columns(3)
-                    col_info1.metric("보유 수량", f"{info['qty']:,}주")
+                    col_info1.metric("수량", f"{info['qty']:,}")
                     col_info2.metric("평가액", f"{info['qty'] * curr_p:,}")
                     col_info3.markdown(f"수익률 <br> <span style='color:{color}; font-weight:bold; font-size:20px'>{rate:.1f}%</span>", unsafe_allow_html=True)
                     
@@ -973,37 +858,27 @@ else:
                         c_sell1, c_sell2, c_sell3 = st.columns([1, 1, 1])
                         s_price = c_sell1.number_input("매도가", value=curr_p, step=100, key=f"sell_p_{code}")
                         s_qty = c_sell2.number_input("수량", 1, info['qty'], info['qty'], key=f"sell_q_{code}")
-                        if c_sell3.button("매도 주문", key=f"btn_sell_{code}", type="primary"):
+                        if c_sell3.button("매도", key=f"btn_sell_{code}", type="primary"):
                             ok, msg = place_order('SELL', code, s_price, s_qty)
                             if ok: st.success(msg); time.sleep(1); st.rerun()
                             else: st.error(msg)
                 st.divider()
 
-    # [⑦ 탭: 내역]
+    # [⑥ 탭: 내역]
     with tabs[5]:
-        st.subheader("📜 거래 및 주문 내역")
-
-        st.markdown("#### ⏳ 미체결 주문 (Pending)")
+        st.subheader("📜 거래 내역")
+        st.markdown("#### ⏳ 미체결")
         my_pending = [o for o in st.session_state['pending_orders'] if o['user'] == user_id]
-        if my_pending:
-            df_pending = pd.DataFrame(my_pending)
-            st.dataframe(df_pending[['code', 'type', 'price', 'qty']], use_container_width=True)
-        else:
-            st.info("대기 중인 주문이 없습니다.")
+        if my_pending: st.dataframe(pd.DataFrame(my_pending)[['code', 'type', 'price', 'qty']], use_container_width=True)
+        else: st.info("없음")
 
         st.divider()
-
-        st.markdown("#### ✅ 체결 내역 (Executed - My Trades)")
+        st.markdown("#### ✅ 체결 완료")
         if 'trade_history' in st.session_state:
-            my_trades = [t for t in st.session_state['trade_history'] 
-                         if t.get('buyer') == user_id or t.get('seller') == user_id]
-            
-            if my_trades:
-                st.dataframe(pd.DataFrame(my_trades), use_container_width=True)
-            else:
-                st.caption("체결된 나의 거래 내역이 없습니다.")
-        else:
-            st.caption("아직 거래 내역이 생성되지 않았습니다.")
+            my_trades = [t for t in st.session_state['trade_history'] if t.get('buyer') == user_id or t.get('seller') == user_id]
+            if my_trades: st.dataframe(pd.DataFrame(my_trades), use_container_width=True)
+            else: st.caption("거래 내역 없음")
+        else: st.caption("내역 없음")
     
     with tabs[6]:
         st.subheader("💱 거래소")
