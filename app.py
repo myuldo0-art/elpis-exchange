@@ -35,7 +35,6 @@ def load_db():
         # A1 셀의 데이터를 가져옴 (매우 긴 텍스트)
         raw_data = worksheet.acell('A1').value
         
-        # [교정 완료] 불필요한 들여쓰기를 제거하여 오류를 해결했습니다.
         if raw_data:
             return json.loads(raw_data)
         return None
@@ -75,7 +74,7 @@ def save_db():
 # --- [페이지 설정] ---
 st.set_page_config(layout="wide", page_title="ELPIS EXCHANGE", page_icon="📈")
 
-# --- [CSS 스타일 : 프리미엄 금융 앱 디자인 (원본 유지)] ---
+# --- [CSS 스타일 : 프리미엄 금융 앱 디자인 (원본 유지 및 메뉴 버튼 고도화)] ---
 st.markdown("""
     <style>
     @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
@@ -207,10 +206,47 @@ st.markdown("""
     .chat-msg { font-size: 15px; color: #333D4B; line-height: 1.4; }
     .chat-time { font-size: 11px; color: #8B95A1; text-align: right; margin-top: 4px; }
     
-    /* [탭] */
-    .stTabs [data-baseweb="tab-list"] { gap: 8px; background-color: white; padding: 10px; border-radius: 12px; border: 1px solid #E5E8EB; }
-    .stTabs [data-baseweb="tab"] { height: 40px; border-radius: 8px; font-weight: 600; font-size: 14px; color: #4E5968; }
-    .stTabs [aria-selected="true"] { background-color: #F2F4F6 !important; color: #191F28 !important; }
+    /* [수정된 탭 메뉴 : 고급 버튼 시각화 디자인] */
+    .stTabs [data-baseweb="tab-list"] { 
+        gap: 12px; 
+        background-color: transparent; 
+        padding: 5px 0px; 
+        border-radius: 0px; 
+        border: none;
+        display: flex;
+        justify-content: flex-start;
+    }
+    .stTabs [data-baseweb="tab"] { 
+        height: 50px; 
+        min-width: 100px;
+        border-radius: 14px !important; 
+        background-color: white !important;
+        border: 1px solid #E5E8EB !important;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.04) !important;
+        font-weight: 700 !important; 
+        font-size: 18px !important; /* 폰트 크기 키움 */
+        color: #4E5968 !important;
+        padding: 0px 20px !important;
+        transition: all 0.25s ease;
+    }
+    /* 탭 호버 시 효과 */
+    .stTabs [data-baseweb="tab"]:hover {
+        transform: translateY(-2px);
+        border-color: #3182F6 !important;
+        color: #3182F6 !important;
+    }
+    /* 활성화된 탭(버튼) 디자인 */
+    .stTabs [aria-selected="true"] { 
+        background-color: #3182F6 !important; 
+        color: white !important; 
+        border: 1px solid #3182F6 !important;
+        box-shadow: 0 4px 12px rgba(49, 130, 246, 0.3) !important;
+    }
+    /* 탭 밑줄 제거 */
+    .stTabs [data-baseweb="tab-highlight"] {
+        display: none !important;
+    }
+
     .big-font { font-size: 32px; font-weight: 800; letter-spacing: -1px; }
     </style>
 """, unsafe_allow_html=True)
@@ -547,7 +583,7 @@ else:
             st.session_state['view_profile_id'] = None
             st.rerun()
     
-    tabs = st.tabs(["메인화면(프로필)", "관심", "현재가", "주문", "잔고", "내역", "거래소"])
+    tabs = st.tabs(["메인화면", "관심", "현재가", "주문", "잔고", "내역", "거래소"])
 
     # [② 탭: 메인화면]
     with tabs[0]:
