@@ -7,9 +7,6 @@ from logic import sync_user_state, save_current_user_state
 # [핵심] 방금 만든 ui.py를 여기서 불러옵니다.
 from ui import render_ui
 
-# --- [버전 관리] ---
-APP_VERSION = "V1.9"
-
 # --- [페이지 설정] ---
 st.set_page_config(layout="wide", page_title="ELPIS EXCHANGE", page_icon="📈")
 
@@ -26,7 +23,10 @@ st.markdown("""
     .main { background-color: #F2F4F6; }
     div[data-testid="stVerticalBlock"] > div { background-color: transparent; }
     .stMetric { background-color: #FFFFFF !important; border: 1px solid #E5E8EB !important; border-radius: 16px !important; padding: 15px !important; box-shadow: 0 2px 8px rgba(0,0,0,0.04) !important; }
-    .auth-card { background-color: #FFFFFF; padding: 40px; border-radius: 24px; box-shadow: 0 10px 40px rgba(0,0,0,0.08); border: 1px solid #E5E8EB; margin-top: 10px; }
+    
+    /* [수정] padding-top을 40px -> 15px로 줄여 빈공간 삭제 */
+    .auth-card { background-color: #FFFFFF; padding: 15px 40px 40px 40px; border-radius: 24px; box-shadow: 0 10px 40px rgba(0,0,0,0.08); border: 1px solid #E5E8EB; margin-top: 10px; }
+    
     .stButton>button { width: 100%; border-radius: 12px !important; font-weight: 600 !important; height: 52px; font-size: 16px; border: none !important; transition: all 0.2s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
     button[kind="primary"] { background-color: #3182F6 !important; color: white !important; }
     button[kind="primary"]:hover { background-color: #1B64DA !important; }
@@ -145,20 +145,10 @@ if not st.session_state['logged_in']:
     col_spacer1, col_center, col_spacer2 = st.columns([1, 6, 1])
     
     with col_center:
-        # [NEW] 버전 및 제작자 정보 (격언 창과 동일한 스타일)
-        st.markdown(f"""
-            <div style='background-color: #FFFFFF; padding: 8px 16px; border-radius: 12px; margin-top: 30px; margin-bottom: 20px; text-align: center; border: 1px solid #E5E8EB; box-shadow: 0 2px 6px rgba(0,0,0,0.03);'>
-                 <span style='color: #8B95A1; font-size: 13px; font-weight: 600;'>거래소 버전 : {APP_VERSION} &nbsp;&nbsp;|&nbsp;&nbsp; 제작 : 이웃집만석꾼</span>
-            </div>
-        """, unsafe_allow_html=True)
-
-        # [NEW] 3D 입체 로고 (ELPIS 거래소)
         st.markdown("""
-            <div style='text-align: center; margin-bottom: 30px;'>
-                <h1 style='color: #3182F6; font-size: 56px; font-weight: 900; letter-spacing: -2px; margin-bottom: 0;
-                text-shadow: 2px 2px 0px #C9D1D9, 4px 4px 0px #E1E4E8, 6px 6px 12px rgba(0,0,0,0.15);'>
-                ELPIS 거래소
-                </h1>
+            <div style='text-align: center; margin-bottom: 15px; margin-top: 20px;'>
+                <h1 style='color: #3182F6; font-size: 52px; font-weight: 900; letter-spacing: -2px; margin-bottom: 0;'>ELPIS</h1>
+                <h3 style='color: #191F28; font-size: 24px; font-weight: 700; letter-spacing: -0.5px; margin-top: 0;'>거래소</h3>
             </div>
         """, unsafe_allow_html=True)
 
@@ -179,7 +169,6 @@ if not st.session_state['logged_in']:
         random.seed(time_slot) 
         today_quote, author = random.choice(quotes_db)
         
-        # 격언 창 (위의 버전 창과 스타일/폭 동일)
         st.markdown(f"""
             <div style='background-color: #FFFFFF; padding: 8px 16px; border-radius: 12px; margin-bottom: 20px; text-align: center; border: 1px solid #E5E8EB; box-shadow: 0 2px 6px rgba(0,0,0,0.03);'>
                 <p style='color: #4E5968; font-size: 12px; font-weight: 500; margin: 0; letter-spacing: -0.3px; line-height: 1.4;'>
@@ -190,6 +179,7 @@ if not st.session_state['logged_in']:
             </div>
         """, unsafe_allow_html=True)
         
+        # [수정] 이 auth-card의 CSS에서 padding-top을 줄여서 위쪽 빈공간을 제거함
         st.markdown("<div class='auth-card'>", unsafe_allow_html=True)
         
         auth_tabs = st.tabs(["🔒 로그인", "📝 회원가입"])
