@@ -221,7 +221,7 @@ def render_ui():
                     st.markdown("<hr style='margin: 6px 0 0 0; border: 0; border-top: 1px solid #F2F4F6;'>", unsafe_allow_html=True)
 
     with tabs[2]:
-        # [DESIGN FIX] 호가창 간격 대폭 축소 CSS
+        # [DESIGN FIX] 호가창 전용 강력한 스타일 주입 (여기서 색상 강제 지정)
         st.markdown("""
             <style>
             /* 버튼과 행 높이를 강제로 줄여서 간격을 대폭 좁힘 */
@@ -234,6 +234,17 @@ def render_ui():
                 background: transparent !important;
             }
             .hoga-row-height { height: 28px !important; line-height: 28px !important; }
+            
+            /* [COLOR FORCE] 컬럼 너비(flex-grow)를 감지하여 색상 강제 적용 */
+            /* 1.21 = Blue (매수) */
+            div[data-testid="column"][style*="1.21"] button p,
+            div[data-testid="column"][style*="1.21"] button div,
+            div[data-testid="column"][style*="1.21"] button { color: #2A6BE2 !important; font-weight: 800 !important; }
+
+            /* 1.22 = Red (매도) */
+            div[data-testid="column"][style*="1.22"] button p,
+            div[data-testid="column"][style*="1.22"] button div,
+            div[data-testid="column"][style*="1.22"] button { color: #E22A2A !important; font-weight: 800 !important; }
             </style>
         """, unsafe_allow_html=True)
 
@@ -280,7 +291,7 @@ def render_ui():
 
         st.markdown("<div class='hoga-container'>", unsafe_allow_html=True)
         
-        # [매도 호가 (Top) - 빨간색으로 변경]
+        # [매도 호가 (Top) - 빨간색 (Red)]
         sell_rows_data = []
         for p, q in best_asks:
             sell_rows_data.append((p, q))
@@ -288,7 +299,7 @@ def render_ui():
             sell_rows_data.insert(0, (None, None))
             
         for p, q in sell_rows_data:
-            # [Fix] 컬럼 너비 1.22 (Red CSS 적용)
+            # [KEY] 1.22 = Red Force
             c1, c2, c3 = st.columns([1, 1.22, 1], gap="small")
             with c1: 
                 if q: st.markdown(f"<div class='hoga-row-height' style='text-align:right; padding-right:12px; font-size:12px; color:#4E5968;'>{q:,}</div>", unsafe_allow_html=True)
@@ -296,11 +307,10 @@ def render_ui():
             with c2: 
                 if p:
                     if not is_me: 
-                        # [Fix] 매도 호가 버튼 (Red CSS가 적용됨)
                         if st.button(f"{p:,}", key=f"ask_btn_{target}_{p}", type="secondary"):
                             quick_buy_popup(target, p, market['name'])
                     else: 
-                         # [Fix] 본인 매도 주문 표시 (price-up = Red)
+                         # 본인 주문 (Red)
                          st.markdown(f"<div class='cell-price price-up hoga-row-height'>{p:,}</div>", unsafe_allow_html=True)
                 else:
                     st.markdown("<div class='hoga-row-height'></div>", unsafe_allow_html=True)
@@ -317,7 +327,7 @@ def render_ui():
             </div>
         """, unsafe_allow_html=True)
 
-        # [매수 호가 (Bottom) - 파란색으로 변경]
+        # [매수 호가 (Bottom) - 파란색 (Blue)]
         buy_rows_data = []
         for p, q in best_bids:
             buy_rows_data.append((p, q))
@@ -325,18 +335,17 @@ def render_ui():
             buy_rows_data.append((None, None))
             
         for p, q in buy_rows_data:
-            # [Fix] 컬럼 너비 1.21 (Blue CSS 적용)
+            # [KEY] 1.21 = Blue Force
             c1, c2, c3 = st.columns([1, 1.21, 1], gap="small")
             with c1: 
                  st.markdown("", unsafe_allow_html=True)
             with c2: 
                 if p:
                     if is_me: 
-                        # [Fix] 매수 호가 버튼 (Blue CSS가 적용됨)
                         if st.button(f"{p:,}", key=f"bid_btn_{target}_{p}", type="secondary"):
                             quick_sell_popup(target, p, market['name'])
                     else:
-                        # [Fix] 타인 매수 주문 표시 (price-down = Blue)
+                        # 타인 주문 (Blue)
                         st.markdown(f"<div class='cell-price price-down hoga-row-height'>{p:,}</div>", unsafe_allow_html=True)
                 else:
                     st.markdown("<div class='hoga-row-height'></div>", unsafe_allow_html=True)
