@@ -502,8 +502,8 @@ def mining():
     else:
         return False, 0
 
-# [NEW] 간편 매수 팝업 (매도 호가 클릭 시 발동)
-@st.experimental_dialog("⚡ 간편 매수 (Quick Buy)")
+# [NEW] 간편 매수 팝업 (버전 호환성 수정: st.dialog 사용)
+@st.dialog("⚡ 간편 매수 (Quick Buy)")
 def quick_buy_popup(code, price, name):
     st.markdown(f"<h3 style='text-align:center;'>{name}</h3>", unsafe_allow_html=True)
     st.markdown(f"<p style='text-align:center; color:#8B95A1; font-size:14px;'>{code}</p>", unsafe_allow_html=True)
@@ -511,7 +511,13 @@ def quick_buy_popup(code, price, name):
     col_info1, col_info2 = st.columns(2)
     col_info1.metric("매수 단가", f"{price:,}")
     
-    max_buyable = int(st.session_state['balance_id'] / price)
+    # 잔고가 0이거나 없을 경우 에러 방지
+    current_balance = st.session_state.get('balance_id', 0)
+    if price > 0:
+        max_buyable = int(current_balance / price)
+    else:
+        max_buyable = 0
+        
     col_info2.metric("매수 가능", f"{max_buyable:,}주")
     
     st.divider()
@@ -519,7 +525,7 @@ def quick_buy_popup(code, price, name):
     q_buy = st.number_input("매수 수량 (주)", min_value=1, value=10, step=1)
     
     total_cost = price * q_buy
-    if total_cost > st.session_state['balance_id']:
+    if total_cost > current_balance:
         st.warning(f"잔고 부족! (필요: {total_cost:,.0f} ID)")
     else:
         st.caption(f"총 주문금액: {total_cost:,.0f} ID")
@@ -533,8 +539,8 @@ def quick_buy_popup(code, price, name):
         else:
             st.error(msg)
 
-# [NEW] 간편 매도 팝업 (매수 호가 클릭 시 발동)
-@st.experimental_dialog("⚡ 간편 매도 (Quick Sell)")
+# [NEW] 간편 매도 팝업 (버전 호환성 수정: st.dialog 사용)
+@st.dialog("⚡ 간편 매도 (Quick Sell)")
 def quick_sell_popup(code, price, name):
     st.markdown(f"<h3 style='text-align:center;'>{name}</h3>", unsafe_allow_html=True)
     st.markdown(f"<p style='text-align:center; color:#8B95A1; font-size:14px;'>{code}</p>", unsafe_allow_html=True)
@@ -547,7 +553,9 @@ def quick_sell_popup(code, price, name):
     
     st.divider()
     
-    q_sell = st.number_input("매도 수량 (주)", min_value=1, max_value=my_qty if my_qty > 0 else 1, value=10, step=1)
+    # 보유 수량이 0일 때 에러 방지
+    max_val = my_qty if my_qty > 0 else 1
+    q_sell = st.number_input("매도 수량 (주)", min_value=1, max_value=max_val, value=10 if my_qty >= 10 else 1, step=1)
     
     total_gain = price * q_sell
     st.caption(f"총 정산금액: {total_gain:,.0f} ID")
@@ -764,7 +772,7 @@ else:
                     r1, r2, r3, r4 = st.columns([4, 3, 2, 1], gap="small")
 
                     with r1:
-                        # [수정] 클릭 시 selected_code 업데이트
+                        # [Sync Logic] 클릭 시 selected_code 업데이트
                         if st.button(f"{info['name']}", key=f"fav_btn_{code}", type="secondary", use_container_width=True):
                             st.session_state['view_profile_id'] = code
                             st.session_state['selected_code'] = code 
@@ -790,7 +798,7 @@ else:
                     st.markdown("<hr style='margin: 6px 0 0 0; border: 0; border-top: 1px solid #F2F4F6;'>", unsafe_allow_html=True)
 
     with tabs[2]:
-        # [수정된 CSS] 컬럼의 미세한 flex 비율 차이를 감지하여 버튼 텍스트 색상 분리 적용
+        # [CSS 보완] button p -> button * 로 변경하여 색상 적용 강제력 향상
         st.markdown("""
             <style>
             /* 1. 매도 호가 (파랑) - flex: 1.21 컬럼 타격 */
@@ -800,7 +808,7 @@ else:
                 padding: 0 !important;
                 box-shadow: none !important;
             }
-            div[data-testid="column"][style*="1.21"] button p {
+            div[data-testid="column"][style*="1.21"] button * {
                 color: #2A6BE2 !important; /* 파랑 */
                 font-weight: 800 !important;
                 font-size: 15px !important;
@@ -816,7 +824,7 @@ else:
                 padding: 0 !important;
                 box-shadow: none !important;
             }
-            div[data-testid="column"][style*="1.22"] button p {
+            div[data-testid="column"][style*="1.22"] button * {
                 color: #E22A2A !important; /* 빨강 */
                 font-weight: 800 !important;
                 font-size: 15px !important;
@@ -873,7 +881,7 @@ else:
         # [호가창 구현]
         st.markdown("<div class='hoga-container'>", unsafe_allow_html=True)
         
-        # 1. 매도 호가 (Sell Rows) - [타인]일 때만 활성화
+        # 1. 매도 호가 (Sell Rows)
         sell_rows_data = []
         for p, q in best_asks:
             sell_rows_data.append((p, q))
@@ -881,17 +889,17 @@ else:
             sell_rows_data.insert(0, (None, None))
             
         for p, q in sell_rows_data:
-            # [CSS TRICK] 중간 컬럼 비율을 1.21로 설정 -> 파란색 버튼으로 인식
             c1, c2, c3 = st.columns([1, 1.21, 1], gap="small")
             with c1: 
                 if q: st.markdown(f"<div style='text-align:right; padding-right:12px; font-size:12px; color:#4E5968; line-height:38px;'>{q:,}</div>", unsafe_allow_html=True)
                 else: st.markdown("", unsafe_allow_html=True)
             with c2: 
                 if p:
-                    if not is_me: # 타인이면 -> 클릭해서 매수 (파란 버튼)
-                        if st.button(f"{p:,}", key=f"ask_btn_{p}", type="secondary"):
+                    if not is_me: # 타인이면 -> 클릭해서 매수
+                        # [Key 보완] target을 포함시켜 Key 충돌 방지
+                        if st.button(f"{p:,}", key=f"ask_btn_{target}_{p}", type="secondary"):
                             quick_buy_popup(target, p, market['name'])
-                    else: # 나 자신이면 -> 클릭 불가 (단순 텍스트)
+                    else: 
                          st.markdown(f"<div class='cell-price price-down' style='line-height:38px;'>{p:,}</div>", unsafe_allow_html=True)
                 else:
                     st.markdown("<div style='height:38px;'></div>", unsafe_allow_html=True)
@@ -909,7 +917,7 @@ else:
             </div>
         """, unsafe_allow_html=True)
 
-        # 3. 매수 호가 (Buy Rows) - [본인]일 때만 활성화
+        # 3. 매수 호가 (Buy Rows)
         buy_rows_data = []
         for p, q in best_bids:
             buy_rows_data.append((p, q))
@@ -917,16 +925,16 @@ else:
             buy_rows_data.append((None, None))
             
         for p, q in buy_rows_data:
-            # [CSS TRICK] 중간 컬럼 비율을 1.22로 설정 -> 빨간색 버튼으로 인식
             c1, c2, c3 = st.columns([1, 1.22, 1], gap="small")
             with c1: 
                  st.markdown("", unsafe_allow_html=True)
             with c2: 
                 if p:
-                    if is_me: # 나 자신이면 -> 클릭해서 매도 (빨간 버튼)
-                        if st.button(f"{p:,}", key=f"bid_btn_{p}", type="secondary"):
+                    if is_me: # 나 자신이면 -> 클릭해서 매도
+                        # [Key 보완] target을 포함시켜 Key 충돌 방지
+                        if st.button(f"{p:,}", key=f"bid_btn_{target}_{p}", type="secondary"):
                             quick_sell_popup(target, p, market['name'])
-                    else: # 타인이면 -> 클릭 불가 (단순 텍스트)
+                    else:
                         st.markdown(f"<div class='cell-price price-up' style='line-height:38px;'>{p:,}</div>", unsafe_allow_html=True)
                 else:
                     st.markdown("<div style='height:38px;'></div>", unsafe_allow_html=True)
@@ -936,7 +944,7 @@ else:
                 
             st.markdown("<hr style='margin:0; border:0; border-bottom:1px solid #F9FAFB;'>", unsafe_allow_html=True)
         
-        st.markdown("</div>", unsafe_allow_html=True) # End hoga-container
+        st.markdown("</div>", unsafe_allow_html=True)
 
         with st.expander("📊 차트", expanded=True):
             fig = go.Figure()
@@ -1014,7 +1022,7 @@ else:
                 color = "#E22A2A" if profit >= 0 else "#2A6BE2"
                 
                 with st.container():
-                    # [수정] 클릭 시 selected_code 업데이트
+                    # [Sync Logic] 클릭 시 selected_code 업데이트
                     if st.button(f"{st.session_state['market_data'][code]['name']} ({code})", key=f"pf_n_{code}", type="secondary"):
                         st.session_state['view_profile_id'] = code
                         st.session_state['selected_code'] = code
