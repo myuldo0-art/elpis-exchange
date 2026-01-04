@@ -41,17 +41,14 @@ def quick_buy_popup(code, price, name):
         else:
             st.error(msg)
 
-# --- [수정된 팝업: 간편 매도 (0주 오류 해결)] ---
+# --- [수정된 팝업: 간편 매도] ---
 @st.dialog("⚡ 간편 매도 (Quick Sell)")
 def quick_sell_popup(code, price, name):
-    # [Fix] 팝업 진입 시 세션 상태 강제 동기화 및 본인 종목 합산
     user_id = st.session_state['user_info'].get('id')
     current_portfolio = st.session_state.get('portfolio', {})
     
-    # 1. 포트폴리오(매수한 주식) 수량 조회
     my_qty = current_portfolio.get(code, {}).get('qty', 0)
     
-    # 2. [핵심 수정] 본인 종목인 경우, 잠겨있는 물량(Initial)도 매도 가능 수량에 포함
     if code == user_id:
         my_qty += st.session_state.get('my_elpis_locked', 0)
 
@@ -60,7 +57,6 @@ def quick_sell_popup(code, price, name):
     
     col_info1, col_info2 = st.columns(2)
     col_info1.metric("매도 단가", f"{price:,}")
-    # [Fix] 이제 본인 주식일 경우 1,000,000주 등으로 정상 표시됨
     col_info2.metric("매도 가능", f"{my_qty:,}주")
     st.divider()
     
@@ -71,7 +67,6 @@ def quick_sell_popup(code, price, name):
     st.caption(f"총 정산금액: {total_gain:,.0f} ID")
     
     if st.button("매도 체결하기", type="primary", use_container_width=True):
-        # 클릭 시점 재검증
         refresh_qty = st.session_state['portfolio'].get(code, {}).get('qty', 0)
         if code == user_id:
             refresh_qty += st.session_state.get('my_elpis_locked', 0)
@@ -226,6 +221,22 @@ def render_ui():
                     st.markdown("<hr style='margin: 6px 0 0 0; border: 0; border-top: 1px solid #F2F4F6;'>", unsafe_allow_html=True)
 
     with tabs[2]:
+        # [DESIGN FIX] 호가창 간격 대폭 축소 CSS
+        st.markdown("""
+            <style>
+            /* 버튼과 행 높이를 강제로 줄여서 간격을 대폭 좁힘 */
+            div[data-testid="column"] { padding: 0px !important; }
+            button[kind="secondary"] { 
+                height: 30px !important; 
+                min-height: 30px !important; 
+                padding: 0px !important; 
+                border: none !important;
+                background: transparent !important;
+            }
+            .hoga-row-height { height: 28px !important; line-height: 28px !important; }
+            </style>
+        """, unsafe_allow_html=True)
+
         col_s1, col_s2 = st.columns([3, 1])
         search_q = col_s1.text_input("검색 (ID/이름)", placeholder="종목 검색...", label_visibility="collapsed")
         if col_s2.button("🔍"):
@@ -269,6 +280,7 @@ def render_ui():
 
         st.markdown("<div class='hoga-container'>", unsafe_allow_html=True)
         
+        # [매도 호가 (Top) - 빨간색으로 변경]
         sell_rows_data = []
         for p, q in best_asks:
             sell_rows_data.append((p, q))
@@ -276,31 +288,36 @@ def render_ui():
             sell_rows_data.insert(0, (None, None))
             
         for p, q in sell_rows_data:
-            c1, c2, c3 = st.columns([1, 1.21, 1], gap="small")
+            # [Fix] 컬럼 너비 1.22 (Red CSS 적용)
+            c1, c2, c3 = st.columns([1, 1.22, 1], gap="small")
             with c1: 
-                if q: st.markdown(f"<div style='text-align:right; padding-right:12px; font-size:12px; color:#4E5968; line-height:38px;'>{q:,}</div>", unsafe_allow_html=True)
+                if q: st.markdown(f"<div class='hoga-row-height' style='text-align:right; padding-right:12px; font-size:12px; color:#4E5968;'>{q:,}</div>", unsafe_allow_html=True)
                 else: st.markdown("", unsafe_allow_html=True)
             with c2: 
                 if p:
                     if not is_me: 
+                        # [Fix] 매도 호가 버튼 (Red CSS가 적용됨)
                         if st.button(f"{p:,}", key=f"ask_btn_{target}_{p}", type="secondary"):
                             quick_buy_popup(target, p, market['name'])
                     else: 
-                         st.markdown(f"<div class='cell-price price-down' style='line-height:38px;'>{p:,}</div>", unsafe_allow_html=True)
+                         # [Fix] 본인 매도 주문 표시 (price-up = Red)
+                         st.markdown(f"<div class='cell-price price-up hoga-row-height'>{p:,}</div>", unsafe_allow_html=True)
                 else:
-                    st.markdown("<div style='height:38px;'></div>", unsafe_allow_html=True)
+                    st.markdown("<div class='hoga-row-height'></div>", unsafe_allow_html=True)
             with c3: 
                 st.markdown("", unsafe_allow_html=True)
             st.markdown("<hr style='margin:0; border:0; border-bottom:1px solid #F9FAFB;'>", unsafe_allow_html=True)
 
+        # [현재가 표시 줄]
         st.markdown(f"""
-            <div style='display:flex; height:40px; align-items:center; border-top:1px solid #E5E8EB; border-bottom:1px solid #E5E8EB;'>
+            <div style='display:flex; height:30px; align-items:center; border-top:1px solid #E5E8EB; border-bottom:1px solid #E5E8EB;'>
                 <div style='flex:1;'></div>
                 <div style='flex:1.2; text-align:center; font-weight:800; font-size:16px; color:#191F28; background-color:#FFF;'>{curr_price:,}</div>
                 <div style='flex:1;'></div>
             </div>
         """, unsafe_allow_html=True)
 
+        # [매수 호가 (Bottom) - 파란색으로 변경]
         buy_rows_data = []
         for p, q in best_bids:
             buy_rows_data.append((p, q))
@@ -308,18 +325,23 @@ def render_ui():
             buy_rows_data.append((None, None))
             
         for p, q in buy_rows_data:
-            c1, c2, c3 = st.columns([1, 1.22, 1], gap="small")
+            # [Fix] 컬럼 너비 1.21 (Blue CSS 적용)
+            c1, c2, c3 = st.columns([1, 1.21, 1], gap="small")
             with c1: 
                  st.markdown("", unsafe_allow_html=True)
             with c2: 
                 if p:
-                    # [Fix] is_me(본인)일 때도 본인 물량 매도 팝업을 띄울 수 있게 허용 (Quick Sell)
-                    if st.button(f"{p:,}", key=f"bid_btn_{target}_{p}", type="secondary"):
-                        quick_sell_popup(target, p, market['name'])
+                    if is_me: 
+                        # [Fix] 매수 호가 버튼 (Blue CSS가 적용됨)
+                        if st.button(f"{p:,}", key=f"bid_btn_{target}_{p}", type="secondary"):
+                            quick_sell_popup(target, p, market['name'])
+                    else:
+                        # [Fix] 타인 매수 주문 표시 (price-down = Blue)
+                        st.markdown(f"<div class='cell-price price-down hoga-row-height'>{p:,}</div>", unsafe_allow_html=True)
                 else:
-                    st.markdown("<div style='height:38px;'></div>", unsafe_allow_html=True)
+                    st.markdown("<div class='hoga-row-height'></div>", unsafe_allow_html=True)
             with c3: 
-                if q: st.markdown(f"<div style='text-align:left; padding-left:12px; font-size:12px; color:#4E5968; line-height:38px;'>{q:,}</div>", unsafe_allow_html=True)
+                if q: st.markdown(f"<div class='hoga-row-height' style='text-align:left; padding-left:12px; font-size:12px; color:#4E5968;'>{q:,}</div>", unsafe_allow_html=True)
                 else: st.markdown("", unsafe_allow_html=True)
             st.markdown("<hr style='margin:0; border:0; border-bottom:1px solid #F9FAFB;'>", unsafe_allow_html=True)
         
