@@ -221,34 +221,19 @@ def render_ui():
                     st.markdown("<hr style='margin: 6px 0 0 0; border: 0; border-top: 1px solid #F2F4F6;'>", unsafe_allow_html=True)
 
     with tabs[2]:
-        # [DESIGN FIX V1.9.1] 호가창 강제 스타일 주입 (식별자 변경: 1.5 / 1.6)
+        # [DESIGN FIX] 호가창 간격 대폭 축소 CSS
         st.markdown("""
             <style>
-            /* 컬럼 간격(gap) 제거 보정 */
+            /* 버튼과 행 높이를 강제로 줄여서 간격을 대폭 좁힘 */
             div[data-testid="column"] { padding: 0px !important; }
-            
-            /* [중요] 버튼 높이와 여백을 강제로 찍어 누름 */
             button[kind="secondary"] { 
                 height: 30px !important; 
                 min-height: 30px !important; 
                 padding: 0px !important; 
-                margin: 0px !important;
                 border: none !important;
                 background: transparent !important;
-                line-height: 1 !important;
             }
             .hoga-row-height { height: 28px !important; line-height: 28px !important; }
-            
-            /* [COLOR FORCE] flex 값을 이용한 강력한 색상 주입 */
-            /* Flex 1.6 = Blue (매수) */
-            div[data-testid="column"][style*="1.6"] button p,
-            div[data-testid="column"][style*="1.6"] button div,
-            div[data-testid="column"][style*="1.6"] button { color: #2A6BE2 !important; font-weight: 800 !important; }
-
-            /* Flex 1.5 = Red (매도) */
-            div[data-testid="column"][style*="1.5"] button p,
-            div[data-testid="column"][style*="1.5"] button div,
-            div[data-testid="column"][style*="1.5"] button { color: #E22A2A !important; font-weight: 800 !important; }
             </style>
         """, unsafe_allow_html=True)
 
@@ -295,7 +280,7 @@ def render_ui():
 
         st.markdown("<div class='hoga-container'>", unsafe_allow_html=True)
         
-        # [매도 호가 (Top) - 빨간색 (Red)]
+        # [매도 호가 (Top) - 빨간색으로 변경]
         sell_rows_data = []
         for p, q in best_asks:
             sell_rows_data.append((p, q))
@@ -303,17 +288,19 @@ def render_ui():
             sell_rows_data.insert(0, (None, None))
             
         for p, q in sell_rows_data:
-            # [KEY] 1.5 = Red Force (확실한 식별자)
-            c1, c2, c3 = st.columns([1, 1.5, 1], gap="small")
+            # [Fix] 컬럼 너비 1.22 (Red CSS 적용)
+            c1, c2, c3 = st.columns([1, 1.22, 1], gap="small")
             with c1: 
                 if q: st.markdown(f"<div class='hoga-row-height' style='text-align:right; padding-right:12px; font-size:12px; color:#4E5968;'>{q:,}</div>", unsafe_allow_html=True)
                 else: st.markdown("", unsafe_allow_html=True)
             with c2: 
                 if p:
                     if not is_me: 
+                        # [Fix] 매도 호가 버튼 (Red CSS가 적용됨)
                         if st.button(f"{p:,}", key=f"ask_btn_{target}_{p}", type="secondary"):
                             quick_buy_popup(target, p, market['name'])
                     else: 
+                         # [Fix] 본인 매도 주문 표시 (price-up = Red)
                          st.markdown(f"<div class='cell-price price-up hoga-row-height'>{p:,}</div>", unsafe_allow_html=True)
                 else:
                     st.markdown("<div class='hoga-row-height'></div>", unsafe_allow_html=True)
@@ -330,7 +317,7 @@ def render_ui():
             </div>
         """, unsafe_allow_html=True)
 
-        # [매수 호가 (Bottom) - 파란색 (Blue)]
+        # [매수 호가 (Bottom) - 파란색으로 변경]
         buy_rows_data = []
         for p, q in best_bids:
             buy_rows_data.append((p, q))
@@ -338,16 +325,18 @@ def render_ui():
             buy_rows_data.append((None, None))
             
         for p, q in buy_rows_data:
-            # [KEY] 1.6 = Blue Force (확실한 식별자)
-            c1, c2, c3 = st.columns([1, 1.6, 1], gap="small")
+            # [Fix] 컬럼 너비 1.21 (Blue CSS 적용)
+            c1, c2, c3 = st.columns([1, 1.21, 1], gap="small")
             with c1: 
                  st.markdown("", unsafe_allow_html=True)
             with c2: 
                 if p:
                     if is_me: 
+                        # [Fix] 매수 호가 버튼 (Blue CSS가 적용됨)
                         if st.button(f"{p:,}", key=f"bid_btn_{target}_{p}", type="secondary"):
                             quick_sell_popup(target, p, market['name'])
                     else:
+                        # [Fix] 타인 매수 주문 표시 (price-down = Blue)
                         st.markdown(f"<div class='cell-price price-down hoga-row-height'>{p:,}</div>", unsafe_allow_html=True)
                 else:
                     st.markdown("<div class='hoga-row-height'></div>", unsafe_allow_html=True)
