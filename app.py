@@ -10,7 +10,6 @@ import gspread
 from google.oauth2.service_account import Credentials
 
 # --- [0. 구글 시트 DB 연결 설정] ---
-# Streamlit Secrets에서 키 가져오기 & 캐싱
 @st.cache_resource
 def init_connection():
     scope = [
@@ -23,29 +22,20 @@ def init_connection():
     return client
 
 # --- [데이터 영구 저장 시스템 : 구글 시트 버전] ---
-# 복잡한 객체 구조를 유지하기 위해 JSON String 형태로 시트 A1 셀에 통째로 저장/로드합니다.
-
 def load_db():
-    """구글 시트에서 전체 데이터를 JSON으로 불러옴"""
     try:
         client = init_connection()
-        sh = client.open("ELPIS_DB") # 구글 시트 파일명
-        worksheet = sh.worksheet("JSON_DATA") # 탭 이름
-        
-        # A1 셀의 데이터를 가져옴 (매우 긴 텍스트)
+        sh = client.open("ELPIS_DB")
+        worksheet = sh.worksheet("JSON_DATA")
         raw_data = worksheet.acell('A1').value
-        
         if raw_data:
             return json.loads(raw_data)
         return None
     except Exception as e:
-        # DB가 비어있거나 연결 실패 시 None 반환 -> 초기화 로직으로 이동
         print(f"DB Load Error: {e}")
         return None
 
 def save_db():
-    """현재 session_state의 핵심 데이터를 구글 시트에 백업"""
-    # 저장할 데이터 추출
     data = {
         'user_db': st.session_state['user_db'],
         'user_names': st.session_state['user_names'],
@@ -56,43 +46,35 @@ def save_db():
         'pending_orders': st.session_state.get('pending_orders', []),
         'interested_codes': list(st.session_state.get('interested_codes', []))
     }
-    
     try:
         client = init_connection()
         sh = client.open("ELPIS_DB")
         worksheet = sh.worksheet("JSON_DATA")
-        
-        # 데이터를 JSON 문자열로 변환
         json_str = json.dumps(data, ensure_ascii=False)
-        
-        # A1 셀에 덮어쓰기
         worksheet.update_acell('A1', json_str)
-        
     except Exception as e:
         st.error(f"데이터 저장 실패 (네트워크 문제일 수 있음): {e}")
 
 # --- [페이지 설정] ---
 st.set_page_config(layout="wide", page_title="ELPIS EXCHANGE", page_icon="📈")
 
-# --- [CSS 스타일 : 모바일 터짐 방지 패치만 적용 (나머지 원본 유지)] ---
+# --- [CSS 스타일] ---
 st.markdown("""
     <style>
     @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
 
-    /* [핵심 수정: Streamlit 기본 상단 여백 강제 제거] */
     .block-container {
         padding-top: 1rem !important;
         padding-bottom: 0rem !important;
         max-width: 100% !important;
-        padding-left: 1rem !important; /* 모바일 여백 확보 */
+        padding-left: 1rem !important;
         padding-right: 1rem !important;
     }
 
-    /* [Pull-to-Refresh 강력 차단 및 가로 스크롤 방지] */
     html, body {
         overscroll-behavior: none !important;
         overscroll-behavior-y: none !important;
-        overflow-x: hidden !important; /* 가로 스크롤 강제 차단 */
+        overflow-x: hidden !important;
     }
     div[data-testid="stAppViewContainer"] {
         overscroll-behavior: none !important;
@@ -109,7 +91,6 @@ st.markdown("""
         display: none !important;
     }
 
-    /* [모바일 반응형 핵심 패치 - 화면 터짐 방지] */
     @media (max-width: 640px) {
         div[data-testid="stHorizontalBlock"] {
             gap: 2px !important; 
@@ -128,7 +109,6 @@ st.markdown("""
         }
     }
 
-    /* [전체 폰트 및 컬러] */
     html, body, .stApp {
         font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif !important;
         background-color: #F2F4F6;
@@ -136,7 +116,6 @@ st.markdown("""
     }
     .main { background-color: #F2F4F6; }
     
-    /* [카드 디자인] */
     div[data-testid="stVerticalBlock"] > div { background-color: transparent; }
     .stMetric {
         background-color: #FFFFFF !important;
@@ -146,7 +125,6 @@ st.markdown("""
         box-shadow: 0 2px 8px rgba(0,0,0,0.04) !important;
     }
     
-    /* [로그인/회원가입 카드 스타일] */
     .auth-card {
         background-color: #FFFFFF;
         padding: 40px;
@@ -156,7 +134,6 @@ st.markdown("""
         margin-top: 10px;
     }
     
-    /* [버튼 스타일] */
     .stButton>button {
         width: 100%;
         border-radius: 12px !important;
@@ -171,7 +148,6 @@ st.markdown("""
     button[kind="primary"]:hover { background-color: #1B64DA !important; }
     button[kind="secondary"] { background-color: #FFFFFF !important; color: #4E5968 !important; border: 1px solid #D1D6DB !important; }
     
-    /* [입력 필드] */
     .stTextInput>div>div>input, .stNumberInput>div>div>input {
         background-color: #FFFFFF !important;
         border: 1px solid #D1D6DB !important;
@@ -185,13 +161,11 @@ st.markdown("""
         box-shadow: 0 0 0 2px rgba(49, 130, 246, 0.2) !important;
     }
 
-    /* [텍스트 컬러] */
     .up-text { color: #E22A2A !important; font-weight: 700; }
     .down-text { color: #2A6BE2 !important; font-weight: 700; }
     .flat-text { color: #333333 !important; font-weight: 700; }
     .small-gray { font-size: 13px; color: #8B95A1; margin-top: 2px; }
     
-    /* [프로필 카드] */
     .profile-card {
         background: white;
         border-radius: 20px;
@@ -204,7 +178,6 @@ st.markdown("""
     .profile-card h2 { margin: 0; font-size: 22px; color: #191F28; }
     .profile-card p { color: #4E5968; font-size: 14px; margin: 8px 0; }
     
-    /* [호가창] */
     .hoga-container {
         font-family: 'Pretendard', sans-serif;
         font-size: 14px;
@@ -231,7 +204,6 @@ st.markdown("""
     .price-down { color: #2A6BE2; }
     .current-price-box { border: 2px solid #191F28 !important; background-color: #FFF !important; color: #191F28 !important; font-size: 16px !important; }
     
-    /* [채팅] */
     .chat-box {
         background-color: #FFFFFF;
         padding: 14px;
@@ -244,7 +216,6 @@ st.markdown("""
     .chat-msg { font-size: 15px; color: #333D4B; line-height: 1.4; }
     .chat-time { font-size: 11px; color: #8B95A1; text-align: right; margin-top: 4px; }
     
-    /* [탭 버튼화 - Master's Instruction 적용] */
     .stTabs [data-baseweb="tab-list"] {
         gap: 12px !important;
         background-color: transparent !important;
@@ -302,7 +273,6 @@ if 'initialized' not in st.session_state:
         st.session_state['pending_orders'] = saved_data.get('pending_orders', [])
         st.session_state['interested_codes'] = set(saved_data.get('interested_codes', ['IU', 'G_DRAGON', 'ELON', 'DEV_MASTER']))
     else:
-        # [초기 데이터 생성 - DB가 비어있을 때 최초 1회 실행]
         st.session_state['user_db'] = {'test': '1234'} 
         st.session_state['user_names'] = {'test': '테스터'}
         st.session_state['user_states'] = {
@@ -314,19 +284,15 @@ if 'initialized' not in st.session_state:
                 'last_mining_time': None
             }
         }
-        
         st.session_state['market_data'] = {
             'IU': {'name': '아이유', 'price': 50000, 'change': 2.5, 'desc': '국내 원탑 솔로 가수', 'history': [48000, 49000, 50000]},
             'G_DRAGON': {'name': '지드래곤', 'price': 45000, 'change': -1.2, 'desc': 'K-POP의 아이콘', 'history': [46000, 45500, 45000]},
             'ELON': {'name': '일론 머스크', 'price': 120000, 'change': 5.8, 'desc': '화성으로 가는 남자', 'history': [110000, 115000, 120000]},
             'DEV_MASTER': {'name': '50년코딩장인', 'price': 10000, 'change': 0.0, 'desc': '이 앱을 만든 개발자', 'history': [10000]}
         }
-        
-        # 봇 생성 로직
         for i in range(5):
             bot_id = f"pppp{i+1}" 
             name = f"Bot_{i+1}"
-            
             st.session_state['user_db'][bot_id] = '1234'
             st.session_state['user_names'][bot_id] = name
             st.session_state['user_states'][bot_id] = {
@@ -343,7 +309,6 @@ if 'initialized' not in st.session_state:
                 'desc': 'AI Bot',
                 'history': [10000]
             }
-
         st.session_state['trade_history'] = []
         st.session_state['board_messages'] = [
             {'code': 'IU', 'user': 'Fan_001', 'msg': '아이유 10만 전자 가즈아!!', 'time': '12:00'},
@@ -357,7 +322,6 @@ if 'initialized' not in st.session_state:
 
 
 # --- [헬퍼 함수] ---
-
 def sync_user_state(user_id):
     if user_id not in st.session_state['user_states']:
         st.session_state['user_states'][user_id] = {
@@ -382,15 +346,11 @@ def save_current_user_state(user_id):
         'my_profile': st.session_state['my_profile'],
         'last_mining_time': st.session_state['last_mining_time']
     }
-    # 사진 데이터는 JSON 저장이 어려우므로 제외 (실제 배포시엔 S3 등 필요)
     temp_profile = st.session_state['my_profile'].copy()
     temp_profile['photo'] = None 
     st.session_state['user_states'][user_id]['my_profile'] = temp_profile
-    
-    # [중요] 상태 변경 시 구글 시트에 저장
     save_db()
 
-# [수정된 코드: DB 즉시 반영]
 def update_price_match(market_code, price):
     market = st.session_state['market_data'][market_code]
     market['price'] = price
@@ -398,9 +358,6 @@ def update_price_match(market_code, price):
     market['history'].append(price)
     save_db()
 
-# --- [리얼 매칭 엔진] ---
-
-# [수정된 코드: 매칭 엔진 고도화 - 상대방 잔고 반영 및 내역 기록]
 def place_order(type, code, price, qty):
     market = st.session_state['market_data'][code]
     user_id = st.session_state['user_info']['id']
@@ -445,7 +402,6 @@ def place_order(type, code, price, qty):
             
             update_price_match(code, match_price)
             
-            # [기록 추가]
             trade_record = {
                 'time': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), 
                 'type': '체결(매수)', 
@@ -509,7 +465,6 @@ def place_order(type, code, price, qty):
             
             update_price_match(code, match_price)
             
-            # [기록 추가]
             trade_record = {
                 'time': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), 
                 'type': '체결(매도)', 
@@ -546,6 +501,68 @@ def mining():
         return True, reward
     else:
         return False, 0
+
+# [NEW] 간편 매수 팝업 (매도 호가 클릭 시 발동)
+@st.experimental_dialog("⚡ 간편 매수 (Quick Buy)")
+def quick_buy_popup(code, price, name):
+    st.markdown(f"<h3 style='text-align:center;'>{name}</h3>", unsafe_allow_html=True)
+    st.markdown(f"<p style='text-align:center; color:#8B95A1; font-size:14px;'>{code}</p>", unsafe_allow_html=True)
+    
+    col_info1, col_info2 = st.columns(2)
+    col_info1.metric("매수 단가", f"{price:,}")
+    
+    max_buyable = int(st.session_state['balance_id'] / price)
+    col_info2.metric("매수 가능", f"{max_buyable:,}주")
+    
+    st.divider()
+    
+    q_buy = st.number_input("매수 수량 (주)", min_value=1, value=10, step=1)
+    
+    total_cost = price * q_buy
+    if total_cost > st.session_state['balance_id']:
+        st.warning(f"잔고 부족! (필요: {total_cost:,.0f} ID)")
+    else:
+        st.caption(f"총 주문금액: {total_cost:,.0f} ID")
+    
+    if st.button("매수 체결하기", type="primary", use_container_width=True):
+        ok, msg = place_order('BUY', code, price, q_buy)
+        if ok:
+            st.success("체결 완료!")
+            time.sleep(1)
+            st.rerun()
+        else:
+            st.error(msg)
+
+# [NEW] 간편 매도 팝업 (매수 호가 클릭 시 발동)
+@st.experimental_dialog("⚡ 간편 매도 (Quick Sell)")
+def quick_sell_popup(code, price, name):
+    st.markdown(f"<h3 style='text-align:center;'>{name}</h3>", unsafe_allow_html=True)
+    st.markdown(f"<p style='text-align:center; color:#8B95A1; font-size:14px;'>{code}</p>", unsafe_allow_html=True)
+    
+    my_qty = st.session_state['portfolio'].get(code, {}).get('qty', 0)
+    
+    col_info1, col_info2 = st.columns(2)
+    col_info1.metric("매도 단가", f"{price:,}")
+    col_info2.metric("매도 가능", f"{my_qty:,}주")
+    
+    st.divider()
+    
+    q_sell = st.number_input("매도 수량 (주)", min_value=1, max_value=my_qty if my_qty > 0 else 1, value=10, step=1)
+    
+    total_gain = price * q_sell
+    st.caption(f"총 정산금액: {total_gain:,.0f} ID")
+    
+    if st.button("매도 체결하기", type="primary", use_container_width=True):
+        if my_qty < q_sell:
+            st.error("보유 수량이 부족합니다.")
+        else:
+            ok, msg = place_order('SELL', code, price, q_sell)
+            if ok:
+                st.success("매도 체결 완료!")
+                time.sleep(1)
+                st.rerun()
+            else:
+                st.error(msg)
 
 # ==========================================
 # [앱 UI 시작]
@@ -712,11 +729,9 @@ else:
         else:
             st.info("아직 도착한 메시지가 없습니다.")
 
-    # [수정된 코드: 모바일 화면 터짐 방지 gap="small"]
     with tabs[1]:
         st.markdown("<h4 style='margin-bottom: 15px; font-weight: 800;'>관심 종목</h4>", unsafe_allow_html=True)
 
-        # 리스트 헤더
         h1, h2, h3, h4 = st.columns([4, 3, 2, 1], gap="small")
         h1.markdown("<span style='color:#8B95A1; font-size:12px; padding-left:4px;'>종목명</span>", unsafe_allow_html=True)
         h2.markdown("<span style='color:#8B95A1; font-size:12px; display:block; text-align:right;'>현재가</span>", unsafe_allow_html=True)
@@ -749,8 +764,10 @@ else:
                     r1, r2, r3, r4 = st.columns([4, 3, 2, 1], gap="small")
 
                     with r1:
+                        # [수정] 클릭 시 selected_code 업데이트
                         if st.button(f"{info['name']}", key=f"fav_btn_{code}", type="secondary", use_container_width=True):
                             st.session_state['view_profile_id'] = code
+                            st.session_state['selected_code'] = code 
                             st.rerun()
                     with r2:
                         st.markdown(f"""
@@ -773,6 +790,43 @@ else:
                     st.markdown("<hr style='margin: 6px 0 0 0; border: 0; border-top: 1px solid #F2F4F6;'>", unsafe_allow_html=True)
 
     with tabs[2]:
+        # [수정된 CSS] 컬럼의 미세한 flex 비율 차이를 감지하여 버튼 텍스트 색상 분리 적용
+        st.markdown("""
+            <style>
+            /* 1. 매도 호가 (파랑) - flex: 1.21 컬럼 타격 */
+            div[data-testid="column"][style*="1.21"] button {
+                background-color: transparent !important;
+                border: none !important;
+                padding: 0 !important;
+                box-shadow: none !important;
+            }
+            div[data-testid="column"][style*="1.21"] button p {
+                color: #2A6BE2 !important; /* 파랑 */
+                font-weight: 800 !important;
+                font-size: 15px !important;
+            }
+            div[data-testid="column"][style*="1.21"] button:hover {
+                background-color: rgba(66, 133, 244, 0.1) !important;
+            }
+
+            /* 2. 매수 호가 (빨강) - flex: 1.22 컬럼 타격 */
+            div[data-testid="column"][style*="1.22"] button {
+                background-color: transparent !important;
+                border: none !important;
+                padding: 0 !important;
+                box-shadow: none !important;
+            }
+            div[data-testid="column"][style*="1.22"] button p {
+                color: #E22A2A !important; /* 빨강 */
+                font-weight: 800 !important;
+                font-size: 15px !important;
+            }
+            div[data-testid="column"][style*="1.22"] button:hover {
+                background-color: rgba(234, 67, 53, 0.1) !important;
+            }
+            </style>
+        """, unsafe_allow_html=True)
+
         col_s1, col_s2 = st.columns([3, 1])
         search_q = col_s1.text_input("검색 (ID/이름)", placeholder="종목 검색...", label_visibility="collapsed")
         if col_s2.button("🔍"):
@@ -792,14 +846,17 @@ else:
         curr_price = market['price']
         change_pct = market['change']
         
+        # [본인 여부 체크]
+        is_me = (target == user_id)
+        
         st.markdown(f"### {market['name']} <span style='font-size:14px; color:gray'>$ELP-{target}</span>", unsafe_allow_html=True)
         pc1, pc2 = st.columns(2)
         color_cls = "price-up" if change_pct >= 0 else "price-down"
         pc1.markdown(f"<div class='big-font {color_cls}'>{curr_price:,} ID</div>", unsafe_allow_html=True)
         pc2.markdown(f"<div class='{color_cls}' style='text-align:right; font-size:18px'>{change_pct}%</div>", unsafe_allow_html=True)
         
+        # [주문북 데이터 집계]
         pending_orders = [o for o in st.session_state['pending_orders'] if o['code'] == target]
-        
         buy_book = {} 
         sell_book = {} 
         
@@ -810,39 +867,76 @@ else:
                 sell_book[o['price']] = sell_book.get(o['price'], 0) + o['qty']
         
         best_asks = sorted(sell_book.items(), key=lambda x: x[0])[:5] 
-        best_asks.sort(key=lambda x: x[0], reverse=True)
+        best_asks.sort(key=lambda x: x[0], reverse=True) 
         best_bids = sorted(buy_book.items(), key=lambda x: x[0], reverse=True)[:5]
 
-        hoga_html = "<div class='hoga-container'>"
+        # [호가창 구현]
+        st.markdown("<div class='hoga-container'>", unsafe_allow_html=True)
         
-        sell_rows = []
+        # 1. 매도 호가 (Sell Rows) - [타인]일 때만 활성화
+        sell_rows_data = []
         for p, q in best_asks:
-            sell_rows.append((p, q))
-        while len(sell_rows) < 5:
-            sell_rows.insert(0, (None, None)) 
+            sell_rows_data.append((p, q))
+        while len(sell_rows_data) < 5:
+            sell_rows_data.insert(0, (None, None))
             
-        for p, q in sell_rows:
-            if p:
-                hoga_html += f"<div class='hoga-row sell-bg'><div class='cell-vol'>{q:,}</div><div class='cell-price price-down'>{p:,}</div><div class='cell-empty'></div></div>"
-            else:
-                hoga_html += f"<div class='hoga-row sell-bg'><div class='cell-vol'></div><div class='cell-price'></div><div class='cell-empty'></div></div>"
+        for p, q in sell_rows_data:
+            # [CSS TRICK] 중간 컬럼 비율을 1.21로 설정 -> 파란색 버튼으로 인식
+            c1, c2, c3 = st.columns([1, 1.21, 1], gap="small")
+            with c1: 
+                if q: st.markdown(f"<div style='text-align:right; padding-right:12px; font-size:12px; color:#4E5968; line-height:38px;'>{q:,}</div>", unsafe_allow_html=True)
+                else: st.markdown("", unsafe_allow_html=True)
+            with c2: 
+                if p:
+                    if not is_me: # 타인이면 -> 클릭해서 매수 (파란 버튼)
+                        if st.button(f"{p:,}", key=f"ask_btn_{p}", type="secondary"):
+                            quick_buy_popup(target, p, market['name'])
+                    else: # 나 자신이면 -> 클릭 불가 (단순 텍스트)
+                         st.markdown(f"<div class='cell-price price-down' style='line-height:38px;'>{p:,}</div>", unsafe_allow_html=True)
+                else:
+                    st.markdown("<div style='height:38px;'></div>", unsafe_allow_html=True)
+            with c3: 
+                st.markdown("", unsafe_allow_html=True)
             
-        hoga_html += f"<div class='hoga-row'><div class='cell-vol'></div><div class='cell-price {color_cls} current-price-box'>{curr_price:,}</div><div class='cell-empty'></div></div>"
-        
-        buy_rows = []
+            st.markdown("<hr style='margin:0; border:0; border-bottom:1px solid #F9FAFB;'>", unsafe_allow_html=True)
+
+        # 2. 현재가 표시줄
+        st.markdown(f"""
+            <div style='display:flex; height:40px; align-items:center; border-top:1px solid #E5E8EB; border-bottom:1px solid #E5E8EB;'>
+                <div style='flex:1;'></div>
+                <div style='flex:1.2; text-align:center; font-weight:800; font-size:16px; color:#191F28; background-color:#FFF;'>{curr_price:,}</div>
+                <div style='flex:1;'></div>
+            </div>
+        """, unsafe_allow_html=True)
+
+        # 3. 매수 호가 (Buy Rows) - [본인]일 때만 활성화
+        buy_rows_data = []
         for p, q in best_bids:
-            buy_rows.append((p, q))
-        while len(buy_rows) < 5:
-            buy_rows.append((None, None))
+            buy_rows_data.append((p, q))
+        while len(buy_rows_data) < 5:
+            buy_rows_data.append((None, None))
             
-        for p, q in buy_rows:
-            if p:
-                hoga_html += f"<div class='hoga-row buy-bg'><div class='cell-empty'></div><div class='cell-price price-up'>{p:,}</div><div class='cell-vol-buy'>{q:,}</div></div>"
-            else:
-                 hoga_html += f"<div class='hoga-row buy-bg'><div class='cell-empty'></div><div class='cell-price'></div><div class='cell-vol-buy'></div></div>"
-            
-        hoga_html += "</div>"
-        st.markdown(hoga_html, unsafe_allow_html=True)
+        for p, q in buy_rows_data:
+            # [CSS TRICK] 중간 컬럼 비율을 1.22로 설정 -> 빨간색 버튼으로 인식
+            c1, c2, c3 = st.columns([1, 1.22, 1], gap="small")
+            with c1: 
+                 st.markdown("", unsafe_allow_html=True)
+            with c2: 
+                if p:
+                    if is_me: # 나 자신이면 -> 클릭해서 매도 (빨간 버튼)
+                        if st.button(f"{p:,}", key=f"bid_btn_{p}", type="secondary"):
+                            quick_sell_popup(target, p, market['name'])
+                    else: # 타인이면 -> 클릭 불가 (단순 텍스트)
+                        st.markdown(f"<div class='cell-price price-up' style='line-height:38px;'>{p:,}</div>", unsafe_allow_html=True)
+                else:
+                    st.markdown("<div style='height:38px;'></div>", unsafe_allow_html=True)
+            with c3: 
+                if q: st.markdown(f"<div style='text-align:left; padding-left:12px; font-size:12px; color:#4E5968; line-height:38px;'>{q:,}</div>", unsafe_allow_html=True)
+                else: st.markdown("", unsafe_allow_html=True)
+                
+            st.markdown("<hr style='margin:0; border:0; border-bottom:1px solid #F9FAFB;'>", unsafe_allow_html=True)
+        
+        st.markdown("</div>", unsafe_allow_html=True) # End hoga-container
 
         with st.expander("📊 차트", expanded=True):
             fig = go.Figure()
@@ -920,8 +1014,10 @@ else:
                 color = "#E22A2A" if profit >= 0 else "#2A6BE2"
                 
                 with st.container():
+                    # [수정] 클릭 시 selected_code 업데이트
                     if st.button(f"{st.session_state['market_data'][code]['name']} ({code})", key=f"pf_n_{code}", type="secondary"):
                         st.session_state['view_profile_id'] = code
+                        st.session_state['selected_code'] = code
                         st.rerun()
                         
                     col_info1, col_info2, col_info3 = st.columns(3)
@@ -939,12 +1035,10 @@ else:
                             else: st.error(msg)
                 st.divider()
 
-    # [수정된 코드: 내역 탭 필터링 적용]
     with tabs[5]:
         st.subheader("📜 나의 거래 내역")
 
         st.markdown("#### ⏳ 미체결 주문 (Pending)")
-        # 내 아이디(user_id)와 일치하는 주문만 필터링
         my_pending = [o for o in st.session_state['pending_orders'] if o['user'] == user_id]
         
         if my_pending:
@@ -957,7 +1051,6 @@ else:
 
         st.markdown("#### ✅ 체결 완료 (Executed)")
         if 'trade_history' in st.session_state and st.session_state['trade_history']:
-            # 구매자(buyer)가 나이거나, 판매자(seller)가 나인 경우만 필터링
             my_trades = [t for t in st.session_state['trade_history'] 
                          if t.get('buyer') == user_id or t.get('seller') == user_id]
             
