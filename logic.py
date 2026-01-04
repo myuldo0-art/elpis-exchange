@@ -1,6 +1,6 @@
 import streamlit as st
 import datetime
-from database import save_db  # database.py에서 save_db 함수를 가져옵니다.
+from database import save_db
 
 # --- [유저 상태 동기화] ---
 def sync_user_state(user_id):
@@ -28,7 +28,6 @@ def save_current_user_state(user_id):
         'my_profile': st.session_state['my_profile'],
         'last_mining_time': st.session_state['last_mining_time']
     }
-    # 사진 객체는 저장하지 않음 (오류 방지)
     temp_profile = st.session_state['my_profile'].copy()
     temp_profile['photo'] = None 
     st.session_state['user_states'][user_id]['my_profile'] = temp_profile
@@ -54,7 +53,6 @@ def place_order(type, code, price, qty):
             
         st.session_state['balance_id'] -= total_cost
         
-        # 매도 주문 검색 (가격 낮은 순)
         sells = [o for o in st.session_state['pending_orders'] if o['code'] == code and o['type'] == 'SELL' and o['price'] <= price]
         sells.sort(key=lambda x: x['price']) 
         
@@ -68,7 +66,6 @@ def place_order(type, code, price, qty):
             match_price = sell_order['price'] 
             seller_id = sell_order['user']
             
-            # 포트폴리오 업데이트
             if code in st.session_state['portfolio']:
                 old_qty = st.session_state['portfolio'][code]['qty']
                 old_avg = st.session_state['portfolio'][code]['avg_price']
@@ -78,21 +75,17 @@ def place_order(type, code, price, qty):
             else:
                 st.session_state['portfolio'][code] = {'qty': match_qty, 'avg_price': match_price}
             
-            # 차액 환불
             refund = (price - match_price) * match_qty
             if refund > 0: st.session_state['balance_id'] += refund
             
-            # 판매자에게 입금
             if seller_id in st.session_state['user_states']:
                 st.session_state['user_states'][seller_id]['balance_id'] += (match_price * match_qty)
             
-            # 주문 수량 차감
             sell_order['qty'] -= match_qty
             remaining_qty -= match_qty
             
             update_price_match(code, match_price)
             
-            # 거래 기록
             trade_record = {
                 'time': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), 
                 'type': '체결(매수)', 
@@ -104,7 +97,6 @@ def place_order(type, code, price, qty):
             }
             st.session_state['trade_history'].insert(0, trade_record)
 
-        # [Hotfix] 잔량 0인 주문 즉시 삭제 (좀비 주문 방지)
         st.session_state['pending_orders'] = [o for o in st.session_state['pending_orders'] if o['qty'] > 0]
         
         if remaining_qty > 0:
@@ -116,15 +108,31 @@ def place_order(type, code, price, qty):
             return True, "전량 체결 완료!"
 
     elif type == 'SELL':
-        my_qty = st.session_state['portfolio'].get(code, {}).get('qty', 0)
-        if my_qty < qty:
+        # [CRITICAL FIX] 본인 종목일 경우 Locked 물량과 Portfolio 물량을 합산하여 검증 및 차감
+        pf_qty = st.session_state['portfolio'].get(code, {}).get('qty', 0)
+        locked_qty = 0
+        if code == user_id:
+            locked_qty = st.session_state.get('my_elpis_locked', 0)
+            
+        total_avail = pf_qty + locked_qty
+        
+        if total_avail < qty:
             return False, "보유 수량이 부족합니다."
             
-        st.session_state['portfolio'][code]['qty'] -= qty
-        if st.session_state['portfolio'][code]['qty'] == 0:
-            del st.session_state['portfolio'][code]
+        # 수량 차감 로직: Portfolio에서 먼저 빼고, 부족하면 Locked에서 뺌
+        remaining_deduct = qty
+        
+        if pf_qty > 0:
+            deduct_p = min(pf_qty, remaining_deduct)
+            st.session_state['portfolio'][code]['qty'] -= deduct_p
+            if st.session_state['portfolio'][code]['qty'] == 0:
+                del st.session_state['portfolio'][code]
+            remaining_deduct -= deduct_p
             
-        # 매수 주문 검색 (가격 높은 순)
+        if remaining_deduct > 0 and code == user_id:
+            st.session_state['my_elpis_locked'] -= remaining_deduct
+
+        # 이하 매칭 로직은 기존과 동일
         buys = [o for o in st.session_state['pending_orders'] if o['code'] == code and o['type'] == 'BUY' and o['price'] >= price]
         buys.sort(key=lambda x: x['price'], reverse=True) 
         
@@ -169,7 +177,6 @@ def place_order(type, code, price, qty):
             }
             st.session_state['trade_history'].insert(0, trade_record)
             
-        # [Hotfix] 잔량 0인 주문 즉시 삭제
         st.session_state['pending_orders'] = [o for o in st.session_state['pending_orders'] if o['qty'] > 0]
         
         if remaining_qty > 0:
