@@ -24,8 +24,8 @@ st.markdown("""
     div[data-testid="stVerticalBlock"] > div { background-color: transparent; }
     .stMetric { background-color: #FFFFFF !important; border: 1px solid #E5E8EB !important; border-radius: 16px !important; padding: 15px !important; box-shadow: 0 2px 8px rgba(0,0,0,0.04) !important; }
     
-    /* [수정] padding-top을 40px -> 15px로 줄여 빈공간 삭제 */
-    .auth-card { background-color: #FFFFFF; padding: 15px 40px 40px 40px; border-radius: 24px; box-shadow: 0 10px 40px rgba(0,0,0,0.08); border: 1px solid #E5E8EB; margin-top: 10px; }
+    /* [수정] padding-top을 1px로 극한으로 줄임 */
+    .auth-card { background-color: #FFFFFF; padding: 1px 40px 40px 40px; border-radius: 24px; box-shadow: 0 10px 40px rgba(0,0,0,0.08); border: 1px solid #E5E8EB; margin-top: 10px; }
     
     .stButton>button { width: 100%; border-radius: 12px !important; font-weight: 600 !important; height: 52px; font-size: 16px; border: none !important; transition: all 0.2s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
     button[kind="primary"] { background-color: #3182F6 !important; color: white !important; }
@@ -145,10 +145,13 @@ if not st.session_state['logged_in']:
     col_spacer1, col_center, col_spacer2 = st.columns([1, 6, 1])
     
     with col_center:
+        # [수정] ELPIS와 거래소 글자 크기(52px) 동일하게 통일
         st.markdown("""
             <div style='text-align: center; margin-bottom: 15px; margin-top: 20px;'>
-                <h1 style='color: #3182F6; font-size: 52px; font-weight: 900; letter-spacing: -2px; margin-bottom: 0;'>ELPIS</h1>
-                <h3 style='color: #191F28; font-size: 24px; font-weight: 700; letter-spacing: -0.5px; margin-top: 0;'>거래소</h3>
+                <h1 style='font-size: 52px; font-weight: 900; letter-spacing: -2px; margin-bottom: 0;'>
+                    <span style='color: #3182F6;'>ELPIS</span> 
+                    <span style='color: #191F28;'>거래소</span>
+                </h1>
             </div>
         """, unsafe_allow_html=True)
 
@@ -179,7 +182,7 @@ if not st.session_state['logged_in']:
             </div>
         """, unsafe_allow_html=True)
         
-        # [수정] 이 auth-card의 CSS에서 padding-top을 줄여서 위쪽 빈공간을 제거함
+        # [수정] padding-top을 줄인 auth-card 적용
         st.markdown("<div class='auth-card'>", unsafe_allow_html=True)
         
         auth_tabs = st.tabs(["🔒 로그인", "📝 회원가입"])
