@@ -104,7 +104,7 @@ def place_order(type, code, price, qty):
             }
             st.session_state['trade_history'].insert(0, trade_record)
 
-        # 잔량 0인 주문 삭제 (Hotfix 적용됨)
+        # [Hotfix] 잔량 0인 주문 즉시 삭제 (좀비 주문 방지)
         st.session_state['pending_orders'] = [o for o in st.session_state['pending_orders'] if o['qty'] > 0]
         
         if remaining_qty > 0:
@@ -169,7 +169,7 @@ def place_order(type, code, price, qty):
             }
             st.session_state['trade_history'].insert(0, trade_record)
             
-        # 잔량 0인 주문 삭제
+        # [Hotfix] 잔량 0인 주문 즉시 삭제
         st.session_state['pending_orders'] = [o for o in st.session_state['pending_orders'] if o['qty'] > 0]
         
         if remaining_qty > 0:
