@@ -44,31 +44,40 @@ def quick_buy_popup(code, price, name):
 # --- [수정된 팝업: 간편 매도 (0주 오류 해결)] ---
 @st.dialog("⚡ 간편 매도 (Quick Sell)")
 def quick_sell_popup(code, price, name):
-    # [Fix] 팝업이 열릴 때 세션 상태를 확실하게 다시 불러옵니다.
+    # [Fix] 팝업 진입 시 세션 상태 강제 동기화 및 본인 종목 합산
+    user_id = st.session_state['user_info'].get('id')
     current_portfolio = st.session_state.get('portfolio', {})
+    
+    # 1. 포트폴리오(매수한 주식) 수량 조회
     my_qty = current_portfolio.get(code, {}).get('qty', 0)
+    
+    # 2. [핵심 수정] 본인 종목인 경우, 잠겨있는 물량(Initial)도 매도 가능 수량에 포함
+    if code == user_id:
+        my_qty += st.session_state.get('my_elpis_locked', 0)
 
     st.markdown(f"<h3 style='text-align:center;'>{name}</h3>", unsafe_allow_html=True)
     st.markdown(f"<p style='text-align:center; color:#8B95A1; font-size:14px;'>{code}</p>", unsafe_allow_html=True)
     
     col_info1, col_info2 = st.columns(2)
     col_info1.metric("매도 단가", f"{price:,}")
-    # [Fix] 확실하게 가져온 수량을 표시
+    # [Fix] 이제 본인 주식일 경우 1,000,000주 등으로 정상 표시됨
     col_info2.metric("매도 가능", f"{my_qty:,}주")
     st.divider()
     
     max_val = my_qty if my_qty > 0 else 1
-    # [Fix] max_value가 0이면 에러나므로 1로 설정하되, 실제 검증은 버튼 클릭 시 수행
     q_sell = st.number_input("매도 수량 (주)", min_value=1, max_value=max_val, value=10 if my_qty >= 10 else 1, step=1)
     
     total_gain = price * q_sell
     st.caption(f"총 정산금액: {total_gain:,.0f} ID")
     
     if st.button("매도 체결하기", type="primary", use_container_width=True):
-        # 버튼 클릭 시점에 다시 한 번 수량 체크
-        fresh_qty = st.session_state['portfolio'].get(code, {}).get('qty', 0)
-        if fresh_qty < q_sell:
-            st.error(f"보유 수량이 부족합니다. (현재: {fresh_qty}주)")
+        # 클릭 시점 재검증
+        refresh_qty = st.session_state['portfolio'].get(code, {}).get('qty', 0)
+        if code == user_id:
+            refresh_qty += st.session_state.get('my_elpis_locked', 0)
+            
+        if refresh_qty < q_sell:
+            st.error(f"보유 수량이 부족합니다. (현재: {refresh_qty}주)")
         else:
             ok, msg = place_order('SELL', code, price, q_sell)
             if ok:
@@ -304,13 +313,9 @@ def render_ui():
                  st.markdown("", unsafe_allow_html=True)
             with c2: 
                 if p:
-                    if is_me: 
-                        if st.button(f"{p:,}", key=f"bid_btn_{target}_{p}", type="secondary"):
-                            # [Fix] 여기가 핵심입니다. 다른 사람이 산다고 올린 걸(bid) 내가 파는 상황.
-                            # 타겟 종목 코드(target)를 팝업에 넘겨줍니다.
-                            quick_sell_popup(target, p, market['name'])
-                    else:
-                        st.markdown(f"<div class='cell-price price-up' style='line-height:38px;'>{p:,}</div>", unsafe_allow_html=True)
+                    # [Fix] is_me(본인)일 때도 본인 물량 매도 팝업을 띄울 수 있게 허용 (Quick Sell)
+                    if st.button(f"{p:,}", key=f"bid_btn_{target}_{p}", type="secondary"):
+                        quick_sell_popup(target, p, market['name'])
                 else:
                     st.markdown("<div style='height:38px;'></div>", unsafe_allow_html=True)
             with c3: 
