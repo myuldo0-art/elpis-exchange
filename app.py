@@ -4,56 +4,10 @@ import datetime
 import plotly.graph_objects as go
 import time
 import random
-import json
-import os
-import gspread
-from google.oauth2.service_account import Credentials
 
-# --- [0. 구글 시트 DB 연결 설정] ---
-@st.cache_resource
-def init_connection():
-    scope = [
-        "https://www.googleapis.com/auth/spreadsheets",
-        "https://www.googleapis.com/auth/drive",
-    ]
-    credentials_dict = st.secrets["gcp_service_account"]
-    creds = Credentials.from_service_account_info(credentials_dict, scopes=scope)
-    client = gspread.authorize(creds)
-    return client
-
-# --- [데이터 영구 저장 시스템 : 구글 시트 버전] ---
-def load_db():
-    try:
-        client = init_connection()
-        sh = client.open("ELPIS_DB")
-        worksheet = sh.worksheet("JSON_DATA")
-        raw_data = worksheet.acell('A1').value
-        if raw_data:
-            return json.loads(raw_data)
-        return None
-    except Exception as e:
-        print(f"DB Load Error: {e}")
-        return None
-
-def save_db():
-    data = {
-        'user_db': st.session_state['user_db'],
-        'user_names': st.session_state['user_names'],
-        'market_data': st.session_state['market_data'],
-        'trade_history': st.session_state['trade_history'],
-        'board_messages': st.session_state['board_messages'],
-        'user_states': st.session_state.get('user_states', {}),
-        'pending_orders': st.session_state.get('pending_orders', []),
-        'interested_codes': list(st.session_state.get('interested_codes', []))
-    }
-    try:
-        client = init_connection()
-        sh = client.open("ELPIS_DB")
-        worksheet = sh.worksheet("JSON_DATA")
-        json_str = json.dumps(data, ensure_ascii=False)
-        worksheet.update_acell('A1', json_str)
-    except Exception as e:
-        st.error(f"데이터 저장 실패 (네트워크 문제일 수 있음): {e}")
+# [모듈 임포트] 분리한 파일들을 여기서 불러옵니다.
+from database import load_db, save_db
+from logic import sync_user_state, place_order, mining, save_current_user_state
 
 # --- [페이지 설정] ---
 st.set_page_config(layout="wide", page_title="ELPIS EXCHANGE", page_icon="📈")
@@ -62,193 +16,60 @@ st.set_page_config(layout="wide", page_title="ELPIS EXCHANGE", page_icon="📈")
 st.markdown("""
     <style>
     @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
-
-    .block-container {
-        padding-top: 1rem !important;
-        padding-bottom: 0rem !important;
-        max-width: 100% !important;
-        padding-left: 1rem !important;
-        padding-right: 1rem !important;
-    }
-
-    html, body {
-        overscroll-behavior: none !important;
-        overscroll-behavior-y: none !important;
-        overflow-x: hidden !important;
-    }
-    div[data-testid="stAppViewContainer"] {
-        overscroll-behavior: none !important;
-        overscroll-behavior-y: none !important;
-        position: fixed !important;
-        left: 0;
-        top: 0;
-        width: 100%;
-        height: 100%;
-        overflow-y: auto !important;
-        background-color: #F2F4F6;
-    }
-    header[data-testid="stHeader"] {
-        display: none !important;
-    }
-
-    @media (max-width: 640px) {
-        div[data-testid="stHorizontalBlock"] {
-            gap: 2px !important; 
-        }
-        div[data-testid="column"] {
-            min-width: 0px !important;
-            flex: 1 !important;
-            padding: 0 !important;
-        }
-        .stButton > button {
-            padding-left: 2px !important;
-            padding-right: 2px !important;
-            font-size: 12px !important;
-            height: 42px !important;
-            min-width: 0px !important;
-        }
-    }
-
-    html, body, .stApp {
-        font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif !important;
-        background-color: #F2F4F6;
-        color: #191F28;
-    }
+    
+    /* 기존 CSS 그대로 유지 */
+    .block-container { padding-top: 1rem !important; padding-bottom: 0rem !important; max-width: 100% !important; padding-left: 1rem !important; padding-right: 1rem !important; }
+    html, body { overscroll-behavior: none !important; overscroll-behavior-y: none !important; overflow-x: hidden !important; }
+    div[data-testid="stAppViewContainer"] { overscroll-behavior: none !important; overscroll-behavior-y: none !important; position: fixed !important; left: 0; top: 0; width: 100%; height: 100%; overflow-y: auto !important; background-color: #F2F4F6; }
+    header[data-testid="stHeader"] { display: none !important; }
+    @media (max-width: 640px) { div[data-testid="stHorizontalBlock"] { gap: 2px !important; } div[data-testid="column"] { min-width: 0px !important; flex: 1 !important; padding: 0 !important; } .stButton > button { padding-left: 2px !important; padding-right: 2px !important; font-size: 12px !important; height: 42px !important; min-width: 0px !important; } }
+    html, body, .stApp { font-family: 'Pretendard', sans-serif !important; background-color: #F2F4F6; color: #191F28; }
     .main { background-color: #F2F4F6; }
-    
     div[data-testid="stVerticalBlock"] > div { background-color: transparent; }
-    .stMetric {
-        background-color: #FFFFFF !important;
-        border: 1px solid #E5E8EB !important;
-        border-radius: 16px !important;
-        padding: 15px !important;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.04) !important;
-    }
-    
-    .auth-card {
-        background-color: #FFFFFF;
-        padding: 40px;
-        border-radius: 24px;
-        box-shadow: 0 10px 40px rgba(0,0,0,0.08);
-        border: 1px solid #E5E8EB;
-        margin-top: 10px;
-    }
-    
-    .stButton>button {
-        width: 100%;
-        border-radius: 12px !important;
-        font-weight: 600 !important;
-        height: 52px;
-        font-size: 16px;
-        border: none !important;
-        transition: all 0.2s ease;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-    }
+    .stMetric { background-color: #FFFFFF !important; border: 1px solid #E5E8EB !important; border-radius: 16px !important; padding: 15px !important; box-shadow: 0 2px 8px rgba(0,0,0,0.04) !important; }
+    .auth-card { background-color: #FFFFFF; padding: 40px; border-radius: 24px; box-shadow: 0 10px 40px rgba(0,0,0,0.08); border: 1px solid #E5E8EB; margin-top: 10px; }
+    .stButton>button { width: 100%; border-radius: 12px !important; font-weight: 600 !important; height: 52px; font-size: 16px; border: none !important; transition: all 0.2s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
     button[kind="primary"] { background-color: #3182F6 !important; color: white !important; }
     button[kind="primary"]:hover { background-color: #1B64DA !important; }
     button[kind="secondary"] { background-color: #FFFFFF !important; color: #4E5968 !important; border: 1px solid #D1D6DB !important; }
-    
-    .stTextInput>div>div>input, .stNumberInput>div>div>input {
-        background-color: #FFFFFF !important;
-        border: 1px solid #D1D6DB !important;
-        border-radius: 10px !important;
-        height: 48px !important;
-        font-size: 16px !important;
-        color: #191F28 !important;
-    }
-    .stTextInput>div>div>input:focus, .stNumberInput>div>div>input:focus {
-        border-color: #3182F6 !important;
-        box-shadow: 0 0 0 2px rgba(49, 130, 246, 0.2) !important;
-    }
-
+    .stTextInput>div>div>input, .stNumberInput>div>div>input { background-color: #FFFFFF !important; border: 1px solid #D1D6DB !important; border-radius: 10px !important; height: 48px !important; font-size: 16px !important; color: #191F28 !important; }
+    .stTextInput>div>div>input:focus, .stNumberInput>div>div>input:focus { border-color: #3182F6 !important; box-shadow: 0 0 0 2px rgba(49, 130, 246, 0.2) !important; }
     .up-text { color: #E22A2A !important; font-weight: 700; }
     .down-text { color: #2A6BE2 !important; font-weight: 700; }
     .flat-text { color: #333333 !important; font-weight: 700; }
     .small-gray { font-size: 13px; color: #8B95A1; margin-top: 2px; }
-    
-    .profile-card {
-        background: white;
-        border-radius: 20px;
-        padding: 24px;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-        text-align: center;
-        margin-bottom: 20px;
-        border: 1px solid #F2F4F6;
-    }
+    .profile-card { background: white; border-radius: 20px; padding: 24px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); text-align: center; margin-bottom: 20px; border: 1px solid #F2F4F6; }
     .profile-card h2 { margin: 0; font-size: 22px; color: #191F28; }
     .profile-card p { color: #4E5968; font-size: 14px; margin: 8px 0; }
-    
-    .hoga-container {
-        font-family: 'Pretendard', sans-serif;
-        font-size: 14px;
-        width: 100%;
-        background: white;
-        border-radius: 12px;
-        overflow: hidden;
-        border: 1px solid #E5E8EB;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-    }
+    .hoga-container { font-family: 'Pretendard', sans-serif; font-size: 14px; width: 100%; background: white; border-radius: 12px; overflow: hidden; border: 1px solid #E5E8EB; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
     .hoga-row { display: flex; height: 38px; align-items: center; border-bottom: 1px solid #F9FAFB; }
     .sell-bg { background-color: rgba(66, 133, 244, 0.04); }
     .buy-bg { background-color: rgba(234, 67, 53, 0.04); }
     .cell-vol { flex: 1; text-align: right; padding-right: 12px; color: #4E5968; font-size: 12px; letter-spacing: -0.5px; }
-    .cell-price { 
-        flex: 1.2; text-align: center; font-weight: 700; font-size: 15px; 
-        background-color: #ffffff; 
-        border-left: 1px solid #F2F4F6; border-right: 1px solid #F2F4F6;
-        cursor: pointer;
-    }
+    .cell-price { flex: 1.2; text-align: center; font-weight: 700; font-size: 15px; background-color: #ffffff; border-left: 1px solid #F2F4F6; border-right: 1px solid #F2F4F6; cursor: pointer; }
     .cell-vol-buy { flex: 1; text-align: left; padding-left: 12px; color: #4E5968; font-size: 12px; letter-spacing: -0.5px; }
     .cell-empty { flex: 1; }
     .price-up { color: #E22A2A; }
     .price-down { color: #2A6BE2; }
     .current-price-box { border: 2px solid #191F28 !important; background-color: #FFF !important; color: #191F28 !important; font-size: 16px !important; }
-    
-    .chat-box {
-        background-color: #FFFFFF;
-        padding: 14px;
-        border-radius: 16px;
-        margin-bottom: 8px;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-        border: 1px solid #F2F4F6;
-    }
+    .chat-box { background-color: #FFFFFF; padding: 14px; border-radius: 16px; margin-bottom: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid #F2F4F6; }
     .chat-user { font-weight: 700; font-size: 14px; color: #191F28; margin-bottom: 4px; }
     .chat-msg { font-size: 15px; color: #333D4B; line-height: 1.4; }
     .chat-time { font-size: 11px; color: #8B95A1; text-align: right; margin-top: 4px; }
-    
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 12px !important;
-        background-color: transparent !important;
-        padding: 10px 0 !important;
-        border: none !important;
-    }
-    .stTabs [data-baseweb="tab"] {
-        height: 65px !important;
-        border-radius: 16px !important;
-        font-weight: 800 !important;
-        font-size: 20px !important;
-        color: #8B95A1 !important;
-        background-color: #FFFFFF !important;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.05) !important;
-        border: 1px solid #F2F4F6 !important;
-        flex-grow: 1 !important;
-        transition: all 0.2s ease !important;
-    }
-    .stTabs [data-baseweb="tab"]:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 15px rgba(0,0,0,0.1) !important;
-        color: #3182F6 !important;
-    }
-    .stTabs [aria-selected="true"] {
-        background-color: #3182F6 !important;
-        color: #FFFFFF !important;
-        box-shadow: 0 6px 16px rgba(49, 130, 246, 0.4) !important;
-        border: none !important;
-    }
-    .stTabs [aria-selected="true"] p {
-        color: #FFFFFF !important;
-    }
+    .stTabs [data-baseweb="tab-list"] { gap: 12px !important; background-color: transparent !important; padding: 10px 0 !important; border: none !important; }
+    .stTabs [data-baseweb="tab"] { height: 65px !important; border-radius: 16px !important; font-weight: 800 !important; font-size: 20px !important; color: #8B95A1 !important; background-color: #FFFFFF !important; box-shadow: 0 4px 10px rgba(0,0,0,0.05) !important; border: 1px solid #F2F4F6 !important; flex-grow: 1 !important; transition: all 0.2s ease !important; }
+    .stTabs [data-baseweb="tab"]:hover { transform: translateY(-2px); box-shadow: 0 6px 15px rgba(0,0,0,0.1) !important; color: #3182F6 !important; }
+    .stTabs [aria-selected="true"] { background-color: #3182F6 !important; color: #FFFFFF !important; box-shadow: 0 6px 16px rgba(49, 130, 246, 0.4) !important; border: none !important; }
+    .stTabs [aria-selected="true"] p { color: #FFFFFF !important; }
     .big-font { font-size: 32px; font-weight: 800; letter-spacing: -1px; }
+    
+    /* 호가창 버튼 강제 스타일링 */
+    div[data-testid="column"][style*="1.21"] button { background-color: transparent !important; border: none !important; padding: 0 !important; box-shadow: none !important; }
+    div[data-testid="column"][style*="1.21"] button * { color: #2A6BE2 !important; font-weight: 800 !important; font-size: 15px !important; }
+    div[data-testid="column"][style*="1.21"] button:hover { background-color: rgba(66, 133, 244, 0.1) !important; }
+    div[data-testid="column"][style*="1.22"] button { background-color: transparent !important; border: none !important; padding: 0 !important; box-shadow: none !important; }
+    div[data-testid="column"][style*="1.22"] button * { color: #E22A2A !important; font-weight: 800 !important; font-size: 15px !important; }
+    div[data-testid="column"][style*="1.22"] button:hover { background-color: rgba(234, 67, 53, 0.1) !important; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -273,6 +94,7 @@ if 'initialized' not in st.session_state:
         st.session_state['pending_orders'] = saved_data.get('pending_orders', [])
         st.session_state['interested_codes'] = set(saved_data.get('interested_codes', ['IU', 'G_DRAGON', 'ELON', 'DEV_MASTER']))
     else:
+        # 기본 초기화 데이터
         st.session_state['user_db'] = {'test': '1234'} 
         st.session_state['user_names'] = {'test': '테스터'}
         st.session_state['user_states'] = {
@@ -290,6 +112,7 @@ if 'initialized' not in st.session_state:
             'ELON': {'name': '일론 머스크', 'price': 120000, 'change': 5.8, 'desc': '화성으로 가는 남자', 'history': [110000, 115000, 120000]},
             'DEV_MASTER': {'name': '50년코딩장인', 'price': 10000, 'change': 0.0, 'desc': '이 앱을 만든 개발자', 'history': [10000]}
         }
+        # 봇 생성
         for i in range(5):
             bot_id = f"pppp{i+1}" 
             name = f"Bot_{i+1}"
@@ -321,188 +144,7 @@ if 'initialized' not in st.session_state:
     st.session_state['selected_code'] = 'IU'
 
 
-# --- [헬퍼 함수] ---
-def sync_user_state(user_id):
-    if user_id not in st.session_state['user_states']:
-        st.session_state['user_states'][user_id] = {
-            'balance_id': 10000000.0,
-            'my_elpis_locked': 1000000,
-            'portfolio': {},
-            'my_profile': {'vision': '', 'sns': '', 'photo': None},
-            'last_mining_time': None
-        }
-    state = st.session_state['user_states'][user_id]
-    st.session_state['balance_id'] = state['balance_id']
-    st.session_state['my_elpis_locked'] = state['my_elpis_locked']
-    st.session_state['portfolio'] = state['portfolio']
-    st.session_state['my_profile'] = state['my_profile']
-    st.session_state['last_mining_time'] = state.get('last_mining_time', None)
-
-def save_current_user_state(user_id):
-    st.session_state['user_states'][user_id] = {
-        'balance_id': st.session_state['balance_id'],
-        'my_elpis_locked': st.session_state['my_elpis_locked'],
-        'portfolio': st.session_state['portfolio'],
-        'my_profile': st.session_state['my_profile'],
-        'last_mining_time': st.session_state['last_mining_time']
-    }
-    temp_profile = st.session_state['my_profile'].copy()
-    temp_profile['photo'] = None 
-    st.session_state['user_states'][user_id]['my_profile'] = temp_profile
-    save_db()
-
-def update_price_match(market_code, price):
-    market = st.session_state['market_data'][market_code]
-    market['price'] = price
-    market['change'] = round(((price - market['history'][0]) / market['history'][0]) * 100, 2)
-    market['history'].append(price)
-    save_db()
-
-def place_order(type, code, price, qty):
-    market = st.session_state['market_data'][code]
-    user_id = st.session_state['user_info']['id']
-    
-    if type == 'BUY':
-        total_cost = price * qty
-        if st.session_state['balance_id'] < total_cost:
-            return False, "이드(잔고)가 부족합니다."
-            
-        st.session_state['balance_id'] -= total_cost
-        
-        sells = [o for o in st.session_state['pending_orders'] if o['code'] == code and o['type'] == 'SELL' and o['price'] <= price]
-        sells.sort(key=lambda x: x['price']) 
-        
-        remaining_qty = qty
-        
-        for sell_order in sells:
-            if remaining_qty <= 0: break
-            if sell_order['user'] == user_id: continue 
-            
-            match_qty = min(remaining_qty, sell_order['qty'])
-            match_price = sell_order['price'] 
-            seller_id = sell_order['user']
-            
-            if code in st.session_state['portfolio']:
-                old_qty = st.session_state['portfolio'][code]['qty']
-                old_avg = st.session_state['portfolio'][code]['avg_price']
-                new_avg = ((old_qty * old_avg) + (match_qty * match_price)) / (old_qty + match_qty)
-                st.session_state['portfolio'][code]['qty'] += match_qty
-                st.session_state['portfolio'][code]['avg_price'] = int(new_avg)
-            else:
-                st.session_state['portfolio'][code] = {'qty': match_qty, 'avg_price': match_price}
-            
-            refund = (price - match_price) * match_qty
-            if refund > 0: st.session_state['balance_id'] += refund
-            
-            if seller_id in st.session_state['user_states']:
-                st.session_state['user_states'][seller_id]['balance_id'] += (match_price * match_qty)
-            
-            sell_order['qty'] -= match_qty
-            remaining_qty -= match_qty
-            
-            update_price_match(code, match_price)
-            
-            trade_record = {
-                'time': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), 
-                'type': '체결(매수)', 
-                'name': market['name'], 
-                'price': match_price, 
-                'qty': match_qty,
-                'buyer': user_id,      
-                'seller': seller_id    
-            }
-            st.session_state['trade_history'].insert(0, trade_record)
-
-        st.session_state['pending_orders'] = [o for o in st.session_state['pending_orders'] if o['qty'] > 0]
-        
-        if remaining_qty > 0:
-            st.session_state['pending_orders'].append({'code': code, 'type': 'BUY', 'price': price, 'qty': remaining_qty, 'user': user_id})
-            save_current_user_state(user_id) 
-            return True, f"{qty-remaining_qty}주 체결, {remaining_qty}주 대기 중"
-        else:
-            save_current_user_state(user_id)
-            return True, "전량 체결 완료!"
-
-    elif type == 'SELL':
-        my_qty = st.session_state['portfolio'].get(code, {}).get('qty', 0)
-        if my_qty < qty:
-            return False, "보유 수량이 부족합니다."
-            
-        st.session_state['portfolio'][code]['qty'] -= qty
-        if st.session_state['portfolio'][code]['qty'] == 0:
-            del st.session_state['portfolio'][code]
-            
-        buys = [o for o in st.session_state['pending_orders'] if o['code'] == code and o['type'] == 'BUY' and o['price'] >= price]
-        buys.sort(key=lambda x: x['price'], reverse=True) 
-        
-        remaining_qty = qty
-        
-        for buy_order in buys:
-            if remaining_qty <= 0: break
-            if buy_order['user'] == user_id: continue 
-            
-            match_qty = min(remaining_qty, buy_order['qty'])
-            match_price = buy_order['price'] 
-            buyer_id = buy_order['user']
-            
-            st.session_state['balance_id'] += (match_price * match_qty)
-            
-            if buyer_id in st.session_state['user_states']:
-                b_state = st.session_state['user_states'][buyer_id]
-                if 'portfolio' not in b_state: b_state['portfolio'] = {}
-                
-                if code in b_state['portfolio']:
-                    b_old_qty = b_state['portfolio'][code]['qty']
-                    b_old_avg = b_state['portfolio'][code]['avg_price']
-                    b_new_avg = ((b_old_qty * b_old_avg) + (match_qty * match_price)) / (b_old_qty + match_qty)
-                    b_state['portfolio'][code]['qty'] += match_qty
-                    b_state['portfolio'][code]['avg_price'] = int(b_new_avg)
-                else:
-                    b_state['portfolio'][code] = {'qty': match_qty, 'avg_price': match_price}
-            
-            buy_order['qty'] -= match_qty
-            remaining_qty -= match_qty
-            
-            update_price_match(code, match_price)
-            
-            trade_record = {
-                'time': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), 
-                'type': '체결(매도)', 
-                'name': market['name'], 
-                'price': match_price, 
-                'qty': match_qty,
-                'buyer': buyer_id,    
-                'seller': user_id     
-            }
-            st.session_state['trade_history'].insert(0, trade_record)
-            
-        st.session_state['pending_orders'] = [o for o in st.session_state['pending_orders'] if o['qty'] > 0]
-        
-        if remaining_qty > 0:
-            st.session_state['pending_orders'].append({'code': code, 'type': 'SELL', 'price': price, 'qty': remaining_qty, 'user': user_id})
-            save_current_user_state(user_id)
-            return True, f"{qty-remaining_qty}주 체결, {remaining_qty}주 대기 중"
-        else:
-            save_current_user_state(user_id)
-            return True, "전량 체결 완료!"
-
-def mining():
-    now = datetime.datetime.now()
-    last = st.session_state.get('last_mining_time')
-    if last and isinstance(last, str):
-        last_dt = datetime.datetime.strptime(last, "%Y-%m-%d %H:%M:%S.%f")
-    else:
-        last_dt = None
-    if last_dt is None or (now - last_dt).total_seconds() > 86400:
-        reward = 100000 
-        st.session_state['balance_id'] += reward
-        st.session_state['last_mining_time'] = str(now)
-        save_current_user_state(st.session_state['user_info']['id'])
-        return True, reward
-    else:
-        return False, 0
-
-# [NEW] 간편 매수 팝업 (버전 호환성 수정: st.dialog 사용)
+# [NEW] 간편 매수 팝업
 @st.dialog("⚡ 간편 매수 (Quick Buy)")
 def quick_buy_popup(code, price, name):
     st.markdown(f"<h3 style='text-align:center;'>{name}</h3>", unsafe_allow_html=True)
@@ -511,7 +153,6 @@ def quick_buy_popup(code, price, name):
     col_info1, col_info2 = st.columns(2)
     col_info1.metric("매수 단가", f"{price:,}")
     
-    # 잔고가 0이거나 없을 경우 에러 방지
     current_balance = st.session_state.get('balance_id', 0)
     if price > 0:
         max_buyable = int(current_balance / price)
@@ -519,7 +160,6 @@ def quick_buy_popup(code, price, name):
         max_buyable = 0
         
     col_info2.metric("매수 가능", f"{max_buyable:,}주")
-    
     st.divider()
     
     q_buy = st.number_input("매수 수량 (주)", min_value=1, value=10, step=1)
@@ -539,21 +179,20 @@ def quick_buy_popup(code, price, name):
         else:
             st.error(msg)
 
-# [NEW] 간편 매도 팝업 (버전 호환성 수정: st.dialog 사용)
+# [NEW] 간편 매도 팝업
 @st.dialog("⚡ 간편 매도 (Quick Sell)")
 def quick_sell_popup(code, price, name):
     st.markdown(f"<h3 style='text-align:center;'>{name}</h3>", unsafe_allow_html=True)
     st.markdown(f"<p style='text-align:center; color:#8B95A1; font-size:14px;'>{code}</p>", unsafe_allow_html=True)
     
+    # [수정 포인트] UI 텍스트가 아닌 실제 세션 데이터 참조
     my_qty = st.session_state['portfolio'].get(code, {}).get('qty', 0)
     
     col_info1, col_info2 = st.columns(2)
     col_info1.metric("매도 단가", f"{price:,}")
     col_info2.metric("매도 가능", f"{my_qty:,}주")
-    
     st.divider()
     
-    # 보유 수량이 0일 때 에러 방지
     max_val = my_qty if my_qty > 0 else 1
     q_sell = st.number_input("매도 수량 (주)", min_value=1, max_value=max_val, value=10 if my_qty >= 10 else 1, step=1)
     
@@ -682,6 +321,11 @@ else:
     
     tabs = st.tabs(["메인화면", "관심", "현재가", "주문", "잔고", "내역", "거래소"])
 
+    # ... (나머지 UI 코드는 기존과 동일하며, 분량이 많아 생략된 부분이 있다면 원본에서 그대로 사용하시면 됩니다.) ...
+    # [주의] 원본 코드의 'tabs' 내부 내용을 그대로 여기에 붙여넣어야 완성됩니다.
+    # 제가 드린 코드는 'app.py'의 뼈대와 핵심 연결 부분입니다.
+    # 원본 코드의 'tabs[0]' 부터 끝까지는 그대로 유지하시면 됩니다.
+    
     with tabs[0]:
         with st.container():
             st.markdown(f"<div style='text-align:center;'>", unsafe_allow_html=True)
@@ -772,7 +416,6 @@ else:
                     r1, r2, r3, r4 = st.columns([4, 3, 2, 1], gap="small")
 
                     with r1:
-                        # [Sync Logic] 클릭 시 selected_code 업데이트
                         if st.button(f"{info['name']}", key=f"fav_btn_{code}", type="secondary", use_container_width=True):
                             st.session_state['view_profile_id'] = code
                             st.session_state['selected_code'] = code 
@@ -798,43 +441,6 @@ else:
                     st.markdown("<hr style='margin: 6px 0 0 0; border: 0; border-top: 1px solid #F2F4F6;'>", unsafe_allow_html=True)
 
     with tabs[2]:
-        # [CSS 보완] button p -> button * 로 변경하여 색상 적용 강제력 향상
-        st.markdown("""
-            <style>
-            /* 1. 매도 호가 (파랑) - flex: 1.21 컬럼 타격 */
-            div[data-testid="column"][style*="1.21"] button {
-                background-color: transparent !important;
-                border: none !important;
-                padding: 0 !important;
-                box-shadow: none !important;
-            }
-            div[data-testid="column"][style*="1.21"] button * {
-                color: #2A6BE2 !important; /* 파랑 */
-                font-weight: 800 !important;
-                font-size: 15px !important;
-            }
-            div[data-testid="column"][style*="1.21"] button:hover {
-                background-color: rgba(66, 133, 244, 0.1) !important;
-            }
-
-            /* 2. 매수 호가 (빨강) - flex: 1.22 컬럼 타격 */
-            div[data-testid="column"][style*="1.22"] button {
-                background-color: transparent !important;
-                border: none !important;
-                padding: 0 !important;
-                box-shadow: none !important;
-            }
-            div[data-testid="column"][style*="1.22"] button * {
-                color: #E22A2A !important; /* 빨강 */
-                font-weight: 800 !important;
-                font-size: 15px !important;
-            }
-            div[data-testid="column"][style*="1.22"] button:hover {
-                background-color: rgba(234, 67, 53, 0.1) !important;
-            }
-            </style>
-        """, unsafe_allow_html=True)
-
         col_s1, col_s2 = st.columns([3, 1])
         search_q = col_s1.text_input("검색 (ID/이름)", placeholder="종목 검색...", label_visibility="collapsed")
         if col_s2.button("🔍"):
@@ -854,7 +460,6 @@ else:
         curr_price = market['price']
         change_pct = market['change']
         
-        # [본인 여부 체크]
         is_me = (target == user_id)
         
         st.markdown(f"### {market['name']} <span style='font-size:14px; color:gray'>$ELP-{target}</span>", unsafe_allow_html=True)
@@ -863,7 +468,6 @@ else:
         pc1.markdown(f"<div class='big-font {color_cls}'>{curr_price:,} ID</div>", unsafe_allow_html=True)
         pc2.markdown(f"<div class='{color_cls}' style='text-align:right; font-size:18px'>{change_pct}%</div>", unsafe_allow_html=True)
         
-        # [주문북 데이터 집계]
         pending_orders = [o for o in st.session_state['pending_orders'] if o['code'] == target]
         buy_book = {} 
         sell_book = {} 
@@ -878,10 +482,8 @@ else:
         best_asks.sort(key=lambda x: x[0], reverse=True) 
         best_bids = sorted(buy_book.items(), key=lambda x: x[0], reverse=True)[:5]
 
-        # [호가창 구현]
         st.markdown("<div class='hoga-container'>", unsafe_allow_html=True)
         
-        # 1. 매도 호가 (Sell Rows)
         sell_rows_data = []
         for p, q in best_asks:
             sell_rows_data.append((p, q))
@@ -895,8 +497,7 @@ else:
                 else: st.markdown("", unsafe_allow_html=True)
             with c2: 
                 if p:
-                    if not is_me: # 타인이면 -> 클릭해서 매수
-                        # [Key 보완] target을 포함시켜 Key 충돌 방지
+                    if not is_me: 
                         if st.button(f"{p:,}", key=f"ask_btn_{target}_{p}", type="secondary"):
                             quick_buy_popup(target, p, market['name'])
                     else: 
@@ -905,10 +506,8 @@ else:
                     st.markdown("<div style='height:38px;'></div>", unsafe_allow_html=True)
             with c3: 
                 st.markdown("", unsafe_allow_html=True)
-            
             st.markdown("<hr style='margin:0; border:0; border-bottom:1px solid #F9FAFB;'>", unsafe_allow_html=True)
 
-        # 2. 현재가 표시줄
         st.markdown(f"""
             <div style='display:flex; height:40px; align-items:center; border-top:1px solid #E5E8EB; border-bottom:1px solid #E5E8EB;'>
                 <div style='flex:1;'></div>
@@ -917,7 +516,6 @@ else:
             </div>
         """, unsafe_allow_html=True)
 
-        # 3. 매수 호가 (Buy Rows)
         buy_rows_data = []
         for p, q in best_bids:
             buy_rows_data.append((p, q))
@@ -930,8 +528,7 @@ else:
                  st.markdown("", unsafe_allow_html=True)
             with c2: 
                 if p:
-                    if is_me: # 나 자신이면 -> 클릭해서 매도
-                        # [Key 보완] target을 포함시켜 Key 충돌 방지
+                    if is_me: 
                         if st.button(f"{p:,}", key=f"bid_btn_{target}_{p}", type="secondary"):
                             quick_sell_popup(target, p, market['name'])
                     else:
@@ -941,7 +538,6 @@ else:
             with c3: 
                 if q: st.markdown(f"<div style='text-align:left; padding-left:12px; font-size:12px; color:#4E5968; line-height:38px;'>{q:,}</div>", unsafe_allow_html=True)
                 else: st.markdown("", unsafe_allow_html=True)
-                
             st.markdown("<hr style='margin:0; border:0; border-bottom:1px solid #F9FAFB;'>", unsafe_allow_html=True)
         
         st.markdown("</div>", unsafe_allow_html=True)
@@ -1022,7 +618,6 @@ else:
                 color = "#E22A2A" if profit >= 0 else "#2A6BE2"
                 
                 with st.container():
-                    # [Sync Logic] 클릭 시 selected_code 업데이트
                     if st.button(f"{st.session_state['market_data'][code]['name']} ({code})", key=f"pf_n_{code}", type="secondary"):
                         st.session_state['view_profile_id'] = code
                         st.session_state['selected_code'] = code
