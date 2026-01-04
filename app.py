@@ -1,13 +1,11 @@
 import streamlit as st
-import pandas as pd
-import datetime
-import plotly.graph_objects as go
 import time
 import random
-
-# [모듈 임포트] 분리한 파일들을 여기서 불러옵니다.
 from database import load_db, save_db
-from logic import sync_user_state, place_order, mining, save_current_user_state
+from logic import sync_user_state, save_current_user_state
+
+# [핵심] 방금 만든 ui.py를 여기서 불러옵니다.
+from ui import render_ui
 
 # --- [페이지 설정] ---
 st.set_page_config(layout="wide", page_title="ELPIS EXCHANGE", page_icon="📈")
@@ -16,8 +14,6 @@ st.set_page_config(layout="wide", page_title="ELPIS EXCHANGE", page_icon="📈")
 st.markdown("""
     <style>
     @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
-    
-    /* 기존 CSS 그대로 유지 */
     .block-container { padding-top: 1rem !important; padding-bottom: 0rem !important; max-width: 100% !important; padding-left: 1rem !important; padding-right: 1rem !important; }
     html, body { overscroll-behavior: none !important; overscroll-behavior-y: none !important; overflow-x: hidden !important; }
     div[data-testid="stAppViewContainer"] { overscroll-behavior: none !important; overscroll-behavior-y: none !important; position: fixed !important; left: 0; top: 0; width: 100%; height: 100%; overflow-y: auto !important; background-color: #F2F4F6; }
@@ -62,8 +58,6 @@ st.markdown("""
     .stTabs [aria-selected="true"] { background-color: #3182F6 !important; color: #FFFFFF !important; box-shadow: 0 6px 16px rgba(49, 130, 246, 0.4) !important; border: none !important; }
     .stTabs [aria-selected="true"] p { color: #FFFFFF !important; }
     .big-font { font-size: 32px; font-weight: 800; letter-spacing: -1px; }
-    
-    /* 호가창 버튼 강제 스타일링 */
     div[data-testid="column"][style*="1.21"] button { background-color: transparent !important; border: none !important; padding: 0 !important; box-shadow: none !important; }
     div[data-testid="column"][style*="1.21"] button * { color: #2A6BE2 !important; font-weight: 800 !important; font-size: 15px !important; }
     div[data-testid="column"][style*="1.21"] button:hover { background-color: rgba(66, 133, 244, 0.1) !important; }
@@ -94,7 +88,6 @@ if 'initialized' not in st.session_state:
         st.session_state['pending_orders'] = saved_data.get('pending_orders', [])
         st.session_state['interested_codes'] = set(saved_data.get('interested_codes', ['IU', 'G_DRAGON', 'ELON', 'DEV_MASTER']))
     else:
-        # 기본 초기화 데이터
         st.session_state['user_db'] = {'test': '1234'} 
         st.session_state['user_names'] = {'test': '테스터'}
         st.session_state['user_states'] = {
@@ -112,7 +105,6 @@ if 'initialized' not in st.session_state:
             'ELON': {'name': '일론 머스크', 'price': 120000, 'change': 5.8, 'desc': '화성으로 가는 남자', 'history': [110000, 115000, 120000]},
             'DEV_MASTER': {'name': '50년코딩장인', 'price': 10000, 'change': 0.0, 'desc': '이 앱을 만든 개발자', 'history': [10000]}
         }
-        # 봇 생성
         for i in range(5):
             bot_id = f"pppp{i+1}" 
             name = f"Bot_{i+1}"
@@ -142,74 +134,6 @@ if 'initialized' not in st.session_state:
         save_db()
 
     st.session_state['selected_code'] = 'IU'
-
-
-# [NEW] 간편 매수 팝업
-@st.dialog("⚡ 간편 매수 (Quick Buy)")
-def quick_buy_popup(code, price, name):
-    st.markdown(f"<h3 style='text-align:center;'>{name}</h3>", unsafe_allow_html=True)
-    st.markdown(f"<p style='text-align:center; color:#8B95A1; font-size:14px;'>{code}</p>", unsafe_allow_html=True)
-    
-    col_info1, col_info2 = st.columns(2)
-    col_info1.metric("매수 단가", f"{price:,}")
-    
-    current_balance = st.session_state.get('balance_id', 0)
-    if price > 0:
-        max_buyable = int(current_balance / price)
-    else:
-        max_buyable = 0
-        
-    col_info2.metric("매수 가능", f"{max_buyable:,}주")
-    st.divider()
-    
-    q_buy = st.number_input("매수 수량 (주)", min_value=1, value=10, step=1)
-    
-    total_cost = price * q_buy
-    if total_cost > current_balance:
-        st.warning(f"잔고 부족! (필요: {total_cost:,.0f} ID)")
-    else:
-        st.caption(f"총 주문금액: {total_cost:,.0f} ID")
-    
-    if st.button("매수 체결하기", type="primary", use_container_width=True):
-        ok, msg = place_order('BUY', code, price, q_buy)
-        if ok:
-            st.success("체결 완료!")
-            time.sleep(1)
-            st.rerun()
-        else:
-            st.error(msg)
-
-# [NEW] 간편 매도 팝업
-@st.dialog("⚡ 간편 매도 (Quick Sell)")
-def quick_sell_popup(code, price, name):
-    st.markdown(f"<h3 style='text-align:center;'>{name}</h3>", unsafe_allow_html=True)
-    st.markdown(f"<p style='text-align:center; color:#8B95A1; font-size:14px;'>{code}</p>", unsafe_allow_html=True)
-    
-    # [수정 포인트] UI 텍스트가 아닌 실제 세션 데이터 참조
-    my_qty = st.session_state['portfolio'].get(code, {}).get('qty', 0)
-    
-    col_info1, col_info2 = st.columns(2)
-    col_info1.metric("매도 단가", f"{price:,}")
-    col_info2.metric("매도 가능", f"{my_qty:,}주")
-    st.divider()
-    
-    max_val = my_qty if my_qty > 0 else 1
-    q_sell = st.number_input("매도 수량 (주)", min_value=1, max_value=max_val, value=10 if my_qty >= 10 else 1, step=1)
-    
-    total_gain = price * q_sell
-    st.caption(f"총 정산금액: {total_gain:,.0f} ID")
-    
-    if st.button("매도 체결하기", type="primary", use_container_width=True):
-        if my_qty < q_sell:
-            st.error("보유 수량이 부족합니다.")
-        else:
-            ok, msg = place_order('SELL', code, price, q_sell)
-            if ok:
-                st.success("매도 체결 완료!")
-                time.sleep(1)
-                st.rerun()
-            else:
-                st.error(msg)
 
 # ==========================================
 # [앱 UI 시작]
@@ -299,371 +223,5 @@ if not st.session_state['logged_in']:
         st.markdown("<div style='text-align: center; margin-top: 30px; color: #B0B8C1; font-size: 12px;'>© 2026 ELPIS EXCHANGE. All rights reserved.</div>", unsafe_allow_html=True)
 
 else:
-    user_id = st.session_state['user_info'].get('id', 'Guest')
-    user_name = st.session_state['user_names'].get(user_id, '사용자')
-    
-    if st.session_state.get('view_profile_id'):
-        target_id = st.session_state['view_profile_id']
-        target_name = st.session_state['user_names'].get(target_id, target_id)
-        
-        p_vision = "정보 없음"
-        p_sns = "정보 없음"
-        if target_id in st.session_state['user_states']:
-            p_vision = st.session_state['user_states'][target_id]['my_profile']['vision']
-            p_sns = st.session_state['user_states'][target_id]['my_profile']['sns']
-        elif target_id in st.session_state['market_data']:
-             p_vision = st.session_state['market_data'][target_id].get('desc', '정보 없음')
-        
-        st.markdown(f"<div class='profile-card'><h2>👤 {target_name} <small>({target_id})</small></h2><hr style='border: 0; border-top: 1px solid #F2F4F6;'><p><b>Vision:</b> {p_vision}</p><p><b>SNS:</b> {p_sns}</p></div>", unsafe_allow_html=True)
-        if st.button("닫기 (Close)", type="secondary"):
-            st.session_state['view_profile_id'] = None
-            st.rerun()
-    
-    tabs = st.tabs(["메인화면", "관심", "현재가", "주문", "잔고", "내역", "거래소"])
-
-    # ... (나머지 UI 코드는 기존과 동일하며, 분량이 많아 생략된 부분이 있다면 원본에서 그대로 사용하시면 됩니다.) ...
-    # [주의] 원본 코드의 'tabs' 내부 내용을 그대로 여기에 붙여넣어야 완성됩니다.
-    # 제가 드린 코드는 'app.py'의 뼈대와 핵심 연결 부분입니다.
-    # 원본 코드의 'tabs[0]' 부터 끝까지는 그대로 유지하시면 됩니다.
-    
-    with tabs[0]:
-        with st.container():
-            st.markdown(f"<div style='text-align:center;'>", unsafe_allow_html=True)
-            col_img1, col_img2, col_img3 = st.columns([1,1,1])
-            with col_img2: 
-                uploaded_file = st.file_uploader("사진", type=['jpg', 'png'], key="profile_upload", label_visibility="collapsed")
-                if uploaded_file is not None:
-                     st.image(uploaded_file, width=120) 
-            
-            with col_img3:
-                if st.button("로그아웃", key="logout_btn", type="secondary"):
-                    st.session_state['logged_in'] = False
-                    st.session_state['user_info'] = {}
-                    st.rerun()
-
-            st.markdown(f"<h2>{user_name} <span style='font-size:16px; color:#8B95A1'>({user_id})</span></h2>", unsafe_allow_html=True)
-            st.caption(st.session_state['my_profile']['vision'] if st.session_state['my_profile']['vision'] else "나의 비전이 없습니다.")
-            st.markdown("</div>", unsafe_allow_html=True)
-        st.markdown("---")
-
-        total_asset = st.session_state['balance_id']
-        for c, d in st.session_state['portfolio'].items():
-            total_asset += (d['qty'] * st.session_state['market_data'][c]['price'])
-
-        with st.container():
-            c1, c2, c3 = st.columns([2, 1, 1])
-            c1.markdown(f"### 💰 총 자산<br><span style='color:#333D4B; font-size:24px; font-weight:bold'>{total_asset:,.0f} ID</span>", unsafe_allow_html=True)
-            c2.metric("보유 이드", f"{st.session_state['balance_id']:,.0f}")
-            c3.metric("내 엘피스", f"{st.session_state['my_elpis_locked']:,}")
-        st.markdown("---")
-        
-        st.subheader("📝 프로필 수정")
-        vision = st.text_area("비전", value=st.session_state['my_profile']['vision'])
-        sns = st.text_input("SNS", value=st.session_state['my_profile']['sns'])
-        if st.button("저장", type="primary"):
-            st.session_state['my_profile']['vision'] = vision
-            st.session_state['my_profile']['sns'] = sns
-            save_current_user_state(user_id) 
-            st.rerun()
-        st.divider()
-        if st.button("⛏️ 채굴 (Daily Mining)", type="primary"):
-            ok, reward = mining()
-            if ok: st.balloons(); st.success(f"+{reward:,} ID"); time.sleep(1); st.rerun()
-            else: st.warning("이미 채굴했습니다.")
-        
-        st.divider()
-        st.subheader(f"📨 {user_name}님에게 남겨진 메시지")
-        my_messages = [m for m in st.session_state['board_messages'] if m['code'] == user_id]
-        
-        if my_messages:
-            for m in my_messages:
-                st.markdown(f"<div class='chat-box'><div class='chat-user'>{m['user']} <span style='font-weight:normal; color:#888;'>님이 작성</span></div><div class='chat-msg'>{m['msg']}</div><div class='chat-time'>{m['time']}</div></div>", unsafe_allow_html=True)
-        else:
-            st.info("아직 도착한 메시지가 없습니다.")
-
-    with tabs[1]:
-        st.markdown("<h4 style='margin-bottom: 15px; font-weight: 800;'>관심 종목</h4>", unsafe_allow_html=True)
-
-        h1, h2, h3, h4 = st.columns([4, 3, 2, 1], gap="small")
-        h1.markdown("<span style='color:#8B95A1; font-size:12px; padding-left:4px;'>종목명</span>", unsafe_allow_html=True)
-        h2.markdown("<span style='color:#8B95A1; font-size:12px; display:block; text-align:right;'>현재가</span>", unsafe_allow_html=True)
-        h3.markdown("<span style='color:#8B95A1; font-size:12px; display:block; text-align:right;'>등락</span>", unsafe_allow_html=True)
-        
-        st.markdown("<hr style='margin: 5px 0 0 0; border: 0; border-top: 1px solid #E5E8EB;'>", unsafe_allow_html=True)
-
-        targets = list(st.session_state['interested_codes'])
-        targets = [t for t in targets if t != user_id]
-
-        if not targets:
-            st.markdown("<div style='text-align:center; padding: 40px 0; color:#8B95A1; font-size:13px;'>관심 종목이 없습니다.</div>", unsafe_allow_html=True)
-
-        for code in targets:
-            if code in st.session_state['market_data']:
-                info = st.session_state['market_data'][code]
-                c_price = info['price']
-                c_change = info['change']
-
-                if c_change > 0:
-                    color = "#E22A2A"; bg_color = "rgba(226, 42, 42, 0.1)"; arrow = "▲"
-                elif c_change < 0:
-                    color = "#2A6BE2"; bg_color = "rgba(42, 107, 226, 0.1)"; arrow = "▼"
-                else:
-                    color = "#333333"; bg_color = "rgba(51, 51, 51, 0.1)"; arrow = "-"
-
-                with st.container():
-                    st.markdown("<div style='height: 6px;'></div>", unsafe_allow_html=True)
-                    
-                    r1, r2, r3, r4 = st.columns([4, 3, 2, 1], gap="small")
-
-                    with r1:
-                        if st.button(f"{info['name']}", key=f"fav_btn_{code}", type="secondary", use_container_width=True):
-                            st.session_state['view_profile_id'] = code
-                            st.session_state['selected_code'] = code 
-                            st.rerun()
-                    with r2:
-                        st.markdown(f"""
-                            <div style='text-align:right; padding-top: 10px; font-weight:700; font-size:13px; color:{color}; letter-spacing:-0.5px;'>
-                                {c_price:,}
-                            </div>
-                        """, unsafe_allow_html=True)
-                    with r3:
-                        st.markdown(f"""
-                            <div style='margin-top: 8px; float:right; background-color: {bg_color}; color: {color}; padding: 2px 4px; border-radius: 4px; font-size: 11px; font-weight: 600; white-space: nowrap;'>
-                                {abs(c_change)}%
-                            </div>
-                        """, unsafe_allow_html=True)
-                    with r4:
-                        if st.button("✕", key=f"del_{code}"): 
-                            st.session_state['interested_codes'].remove(code)
-                            save_db()
-                            st.rerun()
-
-                    st.markdown("<hr style='margin: 6px 0 0 0; border: 0; border-top: 1px solid #F2F4F6;'>", unsafe_allow_html=True)
-
-    with tabs[2]:
-        col_s1, col_s2 = st.columns([3, 1])
-        search_q = col_s1.text_input("검색 (ID/이름)", placeholder="종목 검색...", label_visibility="collapsed")
-        if col_s2.button("🔍"):
-            found = False
-            for k, v in st.session_state['market_data'].items():
-                if search_q in k or search_q in v['name']:
-                    st.session_state['selected_code'] = k
-                    st.session_state['interested_codes'].add(k) 
-                    save_db()
-                    found = True
-                    break
-            if not found: st.toast("검색 결과가 없습니다.")
-            else: st.rerun()
-
-        target = st.session_state['selected_code']
-        market = st.session_state['market_data'][target]
-        curr_price = market['price']
-        change_pct = market['change']
-        
-        is_me = (target == user_id)
-        
-        st.markdown(f"### {market['name']} <span style='font-size:14px; color:gray'>$ELP-{target}</span>", unsafe_allow_html=True)
-        pc1, pc2 = st.columns(2)
-        color_cls = "price-up" if change_pct >= 0 else "price-down"
-        pc1.markdown(f"<div class='big-font {color_cls}'>{curr_price:,} ID</div>", unsafe_allow_html=True)
-        pc2.markdown(f"<div class='{color_cls}' style='text-align:right; font-size:18px'>{change_pct}%</div>", unsafe_allow_html=True)
-        
-        pending_orders = [o for o in st.session_state['pending_orders'] if o['code'] == target]
-        buy_book = {} 
-        sell_book = {} 
-        
-        for o in pending_orders:
-            if o['type'] == 'BUY':
-                buy_book[o['price']] = buy_book.get(o['price'], 0) + o['qty']
-            elif o['type'] == 'SELL':
-                sell_book[o['price']] = sell_book.get(o['price'], 0) + o['qty']
-        
-        best_asks = sorted(sell_book.items(), key=lambda x: x[0])[:5] 
-        best_asks.sort(key=lambda x: x[0], reverse=True) 
-        best_bids = sorted(buy_book.items(), key=lambda x: x[0], reverse=True)[:5]
-
-        st.markdown("<div class='hoga-container'>", unsafe_allow_html=True)
-        
-        sell_rows_data = []
-        for p, q in best_asks:
-            sell_rows_data.append((p, q))
-        while len(sell_rows_data) < 5:
-            sell_rows_data.insert(0, (None, None))
-            
-        for p, q in sell_rows_data:
-            c1, c2, c3 = st.columns([1, 1.21, 1], gap="small")
-            with c1: 
-                if q: st.markdown(f"<div style='text-align:right; padding-right:12px; font-size:12px; color:#4E5968; line-height:38px;'>{q:,}</div>", unsafe_allow_html=True)
-                else: st.markdown("", unsafe_allow_html=True)
-            with c2: 
-                if p:
-                    if not is_me: 
-                        if st.button(f"{p:,}", key=f"ask_btn_{target}_{p}", type="secondary"):
-                            quick_buy_popup(target, p, market['name'])
-                    else: 
-                         st.markdown(f"<div class='cell-price price-down' style='line-height:38px;'>{p:,}</div>", unsafe_allow_html=True)
-                else:
-                    st.markdown("<div style='height:38px;'></div>", unsafe_allow_html=True)
-            with c3: 
-                st.markdown("", unsafe_allow_html=True)
-            st.markdown("<hr style='margin:0; border:0; border-bottom:1px solid #F9FAFB;'>", unsafe_allow_html=True)
-
-        st.markdown(f"""
-            <div style='display:flex; height:40px; align-items:center; border-top:1px solid #E5E8EB; border-bottom:1px solid #E5E8EB;'>
-                <div style='flex:1;'></div>
-                <div style='flex:1.2; text-align:center; font-weight:800; font-size:16px; color:#191F28; background-color:#FFF;'>{curr_price:,}</div>
-                <div style='flex:1;'></div>
-            </div>
-        """, unsafe_allow_html=True)
-
-        buy_rows_data = []
-        for p, q in best_bids:
-            buy_rows_data.append((p, q))
-        while len(buy_rows_data) < 5:
-            buy_rows_data.append((None, None))
-            
-        for p, q in buy_rows_data:
-            c1, c2, c3 = st.columns([1, 1.22, 1], gap="small")
-            with c1: 
-                 st.markdown("", unsafe_allow_html=True)
-            with c2: 
-                if p:
-                    if is_me: 
-                        if st.button(f"{p:,}", key=f"bid_btn_{target}_{p}", type="secondary"):
-                            quick_sell_popup(target, p, market['name'])
-                    else:
-                        st.markdown(f"<div class='cell-price price-up' style='line-height:38px;'>{p:,}</div>", unsafe_allow_html=True)
-                else:
-                    st.markdown("<div style='height:38px;'></div>", unsafe_allow_html=True)
-            with c3: 
-                if q: st.markdown(f"<div style='text-align:left; padding-left:12px; font-size:12px; color:#4E5968; line-height:38px;'>{q:,}</div>", unsafe_allow_html=True)
-                else: st.markdown("", unsafe_allow_html=True)
-            st.markdown("<hr style='margin:0; border:0; border-bottom:1px solid #F9FAFB;'>", unsafe_allow_html=True)
-        
-        st.markdown("</div>", unsafe_allow_html=True)
-
-        with st.expander("📊 차트", expanded=True):
-            fig = go.Figure()
-            fig.add_trace(go.Scatter(y=market['history'], mode='lines+markers', line=dict(color='#E22A2A', width=2)))
-            fig.update_layout(height=200, margin=dict(l=10, r=10, t=10, b=10), dragmode=False, paper_bgcolor='white', plot_bgcolor='#F2F4F6')
-            st.plotly_chart(fig, use_container_width=True, config={'staticPlot': False, 'displayModeBar': False})
-
-        st.divider()
-        st.subheader(f"💬 {market['name']} 토론방 (방명록)")
-        with st.form(key='msg_form', clear_on_submit=True):
-            user_msg = st.text_input("메시지", placeholder="응원/방명록 남기기")
-            if st.form_submit_button("등록", type="primary") and user_msg:
-                st.session_state['board_messages'].insert(0, {'code': target, 'user': user_id, 'msg': user_msg, 'time': datetime.datetime.now().strftime("%H:%M")})
-                save_db()
-                st.rerun()
-        st.markdown("<div style='max-height: 300px; overflow-y: auto;'>", unsafe_allow_html=True)
-        for m in st.session_state['board_messages']:
-            if m['code'] == target:
-                st.markdown(f"<div class='chat-box'><div class='chat-user'>{m['user']}</div><div class='chat-msg'>{m['msg']}</div><div class='chat-time'>{m['time']}</div></div>", unsafe_allow_html=True)
-        st.markdown("</div>", unsafe_allow_html=True)
-
-    with tabs[3]:
-        target = st.session_state['selected_code']
-        market = st.session_state['market_data'][target]
-        st.subheader("🛒 매수 주문")
-        
-        if st.button(f"선택 종목: {market['name']} ({target})", type="secondary", use_container_width=True):
-            st.session_state['view_profile_id'] = target
-            st.rerun()
-        
-        with st.container():
-            st.markdown(f"#### 가용: <span style='color:#3182F6'>{st.session_state['balance_id']:,.0f} ID</span>", unsafe_allow_html=True)
-            buy_price = st.number_input("매수 희망가 (ID)", value=market['price'], step=100, key="buy_price_main")
-            buy_qty = st.number_input("매수 수량 (주)", value=10, step=1, key="buy_qty_main")
-            
-            if st.button("🔴 매수 주문 전송", type="primary"):
-                ok, msg = place_order('BUY', target, buy_price, buy_qty)
-                if ok: st.success(msg); time.sleep(1); st.rerun()
-                else: st.error(msg)
-
-    with tabs[4]:
-        st.subheader("💼 잔고 및 매도")
-        
-        with st.expander("📢 내 엘피스 상장 (IPO)", expanded=True):
-            locked = st.session_state['my_elpis_locked']
-            st.markdown(f"**보유(Lock): {locked:,} 주**")
-            c1, c2 = st.columns(2)
-            ipo_qty = c1.number_input("상장 수량", 1, locked, 1000, key="ipo_qty")
-            ipo_price = c2.number_input("상장 가격", 100, value=10000, key="ipo_price")
-            if st.button("내 엘피스 시장에 팔기 (상장)", type="primary"):
-                if locked >= ipo_qty:
-                    st.session_state['my_elpis_locked'] -= ipo_qty
-                    if user_id in st.session_state['market_data']:
-                        st.session_state['market_data'][user_id]['price'] = ipo_price
-                    else:
-                        st.session_state['market_data'][user_id] = {'name': user_id, 'price': ipo_price, 'change': 0.0, 'desc': '신규 상장', 'history': [ipo_price]}
-                    
-                    st.session_state['pending_orders'].append({'code': user_id, 'type': 'SELL', 'price': ipo_price, 'qty': ipo_qty, 'user': user_id})
-                    
-                    st.session_state['interested_codes'].add(user_id)
-                    save_current_user_state(user_id) 
-                    st.success("상장 주문 등록 완료! (매수자가 나타나면 체결됩니다)"); time.sleep(1.5); st.rerun()
-                else:
-                    st.error("보유 수량이 부족합니다.")
-        
-        st.divider()
-
-        if not st.session_state['portfolio']: 
-            st.info("보유 중인 주식이 없습니다.")
-        else:
-            for code, info in st.session_state['portfolio'].items():
-                curr_p = st.session_state['market_data'][code]['price']
-                profit = (info['qty'] * curr_p) - (info['qty'] * info['avg_price'])
-                rate = (profit / (info['qty'] * info['avg_price'])) * 100
-                color = "#E22A2A" if profit >= 0 else "#2A6BE2"
-                
-                with st.container():
-                    if st.button(f"{st.session_state['market_data'][code]['name']} ({code})", key=f"pf_n_{code}", type="secondary"):
-                        st.session_state['view_profile_id'] = code
-                        st.session_state['selected_code'] = code
-                        st.rerun()
-                        
-                    col_info1, col_info2, col_info3 = st.columns(3)
-                    col_info1.metric("보유 수량", f"{info['qty']:,}주")
-                    col_info2.metric("평가액", f"{info['qty'] * curr_p:,}")
-                    col_info3.markdown(f"수익률 <br> <span style='color:{color}; font-weight:bold; font-size:20px'>{rate:.1f}%</span>", unsafe_allow_html=True)
-                    
-                    with st.expander("🔵 매도 하기"):
-                        c_sell1, c_sell2, c_sell3 = st.columns([1, 1, 1])
-                        s_price = c_sell1.number_input("매도가", value=curr_p, step=100, key=f"sell_p_{code}")
-                        s_qty = c_sell2.number_input("수량", 1, info['qty'], info['qty'], key=f"sell_q_{code}")
-                        if c_sell3.button("매도 주문", key=f"btn_sell_{code}", type="primary"):
-                            ok, msg = place_order('SELL', code, s_price, s_qty)
-                            if ok: st.success(msg); time.sleep(1); st.rerun()
-                            else: st.error(msg)
-                st.divider()
-
-    with tabs[5]:
-        st.subheader("📜 나의 거래 내역")
-
-        st.markdown("#### ⏳ 미체결 주문 (Pending)")
-        my_pending = [o for o in st.session_state['pending_orders'] if o['user'] == user_id]
-        
-        if my_pending:
-            df_pending = pd.DataFrame(my_pending)
-            st.dataframe(df_pending[['code', 'type', 'price', 'qty']], use_container_width=True)
-        else:
-            st.info("대기 중인 주문이 없습니다.")
-
-        st.divider()
-
-        st.markdown("#### ✅ 체결 완료 (Executed)")
-        if 'trade_history' in st.session_state and st.session_state['trade_history']:
-            my_trades = [t for t in st.session_state['trade_history'] 
-                         if t.get('buyer') == user_id or t.get('seller') == user_id]
-            
-            if my_trades:
-                st.dataframe(pd.DataFrame(my_trades)[['time', 'name', 'type', 'price', 'qty']], use_container_width=True)
-            else:
-                st.caption("아직 체결된 나의 거래 내역이 없습니다.")
-        else:
-            st.caption("거래 내역이 생성되지 않았습니다.")
-    
-    with tabs[6]:
-        st.subheader("💱 거래소")
-        st.info("Coming Soon")
+    # 로그인 후 화면은 ui.py의 render_ui 함수가 전담합니다.
+    render_ui()
