@@ -112,26 +112,6 @@ def quick_sell_popup(code, price, name):
             else:
                 st.error(msg)
 
-# --- [신규] 프로필 상세 보기 (팝업 모달) ---
-@st.dialog("👤 프로필 상세")
-def profile_detail_popup(target_id):
-    target_name = st.session_state['user_names'].get(target_id, target_id)
-    
-    p_vision = "정보 없음"
-    p_sns = "정보 없음"
-    if target_id in st.session_state['user_states']:
-        p_vision = st.session_state['user_states'][target_id]['my_profile']['vision']
-        p_sns = st.session_state['user_states'][target_id]['my_profile']['sns']
-    elif target_id in st.session_state['market_data']:
-            p_vision = st.session_state['market_data'][target_id].get('desc', '정보 없음')
-    
-    st.markdown(f"<div class='profile-card'><h2>{target_name} <small>({target_id})</small></h2><hr style='border: 0; border-top: 1px solid #F2F4F6;'><p><b>Vision:</b> {p_vision}</p><p><b>SNS:</b> {p_sns}</p></div>", unsafe_allow_html=True)
-    
-    # 닫기 버튼: 상태 초기화 후 리런
-    if st.button("닫기 (Close)", type="secondary", use_container_width=True):
-        st.session_state['view_profile_id'] = None
-        st.rerun()
-
 # --- [UI 렌더링 메인 함수] ---
 def render_ui():
     user_id = st.session_state['user_info'].get('id', 'Guest')
@@ -143,9 +123,22 @@ def render_ui():
     if 'likes' not in st.session_state['my_profile']:
         st.session_state['my_profile']['likes'] = []
 
-    # [수정] 프로필 보기를 '팝업(@st.dialog)'으로 처리하여 화면 이동(딸려감) 방지
     if st.session_state.get('view_profile_id'):
-        profile_detail_popup(st.session_state['view_profile_id'])
+        target_id = st.session_state['view_profile_id']
+        target_name = st.session_state['user_names'].get(target_id, target_id)
+        
+        p_vision = "정보 없음"
+        p_sns = "정보 없음"
+        if target_id in st.session_state['user_states']:
+            p_vision = st.session_state['user_states'][target_id]['my_profile']['vision']
+            p_sns = st.session_state['user_states'][target_id]['my_profile']['sns']
+        elif target_id in st.session_state['market_data']:
+             p_vision = st.session_state['market_data'][target_id].get('desc', '정보 없음')
+        
+        st.markdown(f"<div class='profile-card'><h2>👤 {target_name} <small>({target_id})</small></h2><hr style='border: 0; border-top: 1px solid #F2F4F6;'><p><b>Vision:</b> {p_vision}</p><p><b>SNS:</b> {p_sns}</p></div>", unsafe_allow_html=True)
+        if st.button("닫기 (Close)", type="secondary"):
+            st.session_state['view_profile_id'] = None
+            st.rerun()
             
     tabs = st.tabs(["메인화면", "관심", "현재가", "주문", "잔고", "내역", "거래소"])
 
@@ -277,10 +270,8 @@ def render_ui():
                     r1, r2, r3, r4 = st.columns([4, 3, 2, 1], gap="small")
 
                     with r1:
-                        if st.button(f"### :violet[{info['name']}]", key=f"fav_btn_{code}", type="secondary", use_container_width=True):
+                        if st.button(f"{info['name']}", key=f"fav_btn_{code}", type="secondary", use_container_width=True):
                             st.session_state['view_profile_id'] = code
-                            # 굳이 이동하지 않고 팝업만 띄우려면 selected_code 변경은 선택사항이지만
-                            # 상세 정보를 보려면 변경해주는 것이 좋음
                             st.session_state['selected_code'] = code 
                             st.rerun()
                     with r2:
@@ -362,12 +353,7 @@ def render_ui():
         
         is_me = (target == user_id)
         
-        # [수정] 종목명을 버튼으로 변경하여 클릭 시 프로필 팝업 연동
-        # 스타일은 관심종목(Tab 1)과 동일하게 보라색 + 굵게 적용
-        if st.button(f"### :violet[{market['name']}] <span style='font-size:14px; color:gray'>$ELP-{target}</span>", type="secondary", use_container_width=True):
-             st.session_state['view_profile_id'] = target
-             st.rerun()
-
+        st.markdown(f"### {market['name']} <span style='font-size:14px; color:gray'>$ELP-{target}</span>", unsafe_allow_html=True)
         pc1, pc2 = st.columns(2)
         color_cls = "price-up" if change_pct >= 0 else "price-down"
         pc1.markdown(f"<div class='big-font {color_cls}'>{curr_price:,} ID</div>", unsafe_allow_html=True)
@@ -492,6 +478,7 @@ def render_ui():
         with st.expander("📢 내 엘피스 상장 (IPO)", expanded=True):
             locked = st.session_state['my_elpis_locked']
             st.markdown(f"**보유(Lock): {locked:,} 주**")
+            # [추가] 실시간 예수금 표시
             st.markdown(f"**현재 예수금(ID): {st.session_state['balance_id']:,.0f} ID**")
             
             c1, c2 = st.columns(2)
@@ -548,50 +535,11 @@ def render_ui():
         st.subheader("📜 나의 거래 내역")
 
         st.markdown("#### ⏳ 미체결 주문 (Pending)")
-        
         my_pending = [o for o in st.session_state['pending_orders'] if o['user'] == user_id]
         
         if my_pending:
-            h1, h2, h3, h4, h5 = st.columns([2, 1, 2, 2, 1.5])
-            h1.markdown("**종목**")
-            h2.markdown("**구분**")
-            h3.markdown("**가격**")
-            h4.markdown("**수량**")
-            h5.markdown("**관리**")
-            st.divider()
-
-            for i, order in enumerate(my_pending):
-                c1, c2, c3, c4, c5 = st.columns([2, 1, 2, 2, 1.5])
-                
-                o_name = order['code']
-                if order['code'] in st.session_state['market_data']:
-                    o_name = st.session_state['market_data'][order['code']]['name']
-                
-                c1.text(o_name)
-                type_color = "red" if order['type'] == 'BUY' else "blue"
-                c2.markdown(f":{type_color}[{order['type']}]")
-                c3.text(f"{order['price']:,}")
-                c4.text(f"{order['qty']:,}")
-                
-                if c5.button("취소", key=f"cancel_{i}_{order['code']}"):
-                    if order['type'] == 'BUY':
-                        refund_cash = order['price'] * order['qty']
-                        st.session_state['balance_id'] += refund_cash
-                    else: # SELL
-                        if order['code'] == user_id:
-                            st.session_state['my_elpis_locked'] += order['qty']
-                        else:
-                            if order['code'] not in st.session_state['portfolio']:
-                                st.session_state['portfolio'][order['code']] = {'qty': 0, 'avg_price': 0}
-                            st.session_state['portfolio'][order['code']]['qty'] += order['qty']
-                    
-                    st.session_state['pending_orders'].remove(order)
-                    save_current_user_state(user_id)
-                    st.success("취소 완료")
-                    time.sleep(0.5)
-                    st.rerun()
-                
-                st.markdown("<hr style='margin: 5px 0; opacity: 0.5;'>", unsafe_allow_html=True)
+            df_pending = pd.DataFrame(my_pending)
+            st.dataframe(df_pending[['code', 'type', 'price', 'qty']], use_container_width=True)
         else:
             st.info("대기 중인 주문이 없습니다.")
 
