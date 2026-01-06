@@ -167,8 +167,9 @@ def render_ui():
                     st.session_state['uploaded_photo_cache'] = None
                     st.rerun()
 
-            # [레이아웃 수정] 성명(좌) + 사진(우) 배치
-            col_profile_info, col_profile_img = st.columns([3, 1.2]) # 사진 영역 약간 확보
+            # [UI 고급화] 성명(좌) + 사진(우) 배치 비율 조정
+            # 2.8 : 1.2 비율로 텍스트 공간을 확보하고 사진 공간을 적절히 제한함
+            col_profile_info, col_profile_img = st.columns([2.8, 1.2]) 
             
             with col_profile_info:
                 st.markdown(f"<h2>{user_name} <span style='font-size:16px; color:#8B95A1'>({user_id})</span></h2>", unsafe_allow_html=True)
@@ -196,7 +197,7 @@ def render_ui():
         vision = st.text_area("비전", value=st.session_state['my_profile']['vision'])
         sns = st.text_input("SNS", value=st.session_state['my_profile']['sns'])
         
-        # [기능 수정] 저장 버튼 눌러도 사진 유지되도록 처리
+        # [기능 유지] 저장 버튼 눌러도 사진 유지되도록 처리
         if st.button("저장", type="primary"):
             st.session_state['my_profile']['vision'] = vision
             st.session_state['my_profile']['sns'] = sns
@@ -206,7 +207,7 @@ def render_ui():
         st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
         uploaded_file = st.file_uploader("사진", type=['jpg', 'png'], key="profile_upload", label_visibility="collapsed")
         
-        # [로직] 사진 업로드 및 캐시 유지 로직
+        # [UI 고급화 수정 적용]
         photo_to_show = None
         if uploaded_file is not None:
             st.session_state['uploaded_photo_cache'] = uploaded_file
@@ -215,8 +216,9 @@ def render_ui():
             photo_to_show = st.session_state['uploaded_photo_cache']
             
         if photo_to_show:
-            # use_column_width=True 로 세로 비율 꽉 차게 표시
-            profile_img_placeholder.image(photo_to_show, use_column_width=True)
+            # [핵심 수정] width=110 으로 고정하여 '거대한 사진' 방지
+            # use_column_width=True 제거 -> 모바일에서도 단정한 여권사진 크기로 나옴
+            profile_img_placeholder.image(photo_to_show, width=110)
 
         st.divider()
         if st.button("⛏️ 채굴 (Daily Mining)", type="primary"):
