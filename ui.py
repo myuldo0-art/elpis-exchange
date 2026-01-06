@@ -109,19 +109,26 @@ def render_ui():
     with tabs[0]:
         with st.container():
             st.markdown(f"<div style='text-align:center;'>", unsafe_allow_html=True)
-            col_img1, col_img2, col_img3 = st.columns([1,1,1])
-            with col_img2: 
-                # [이동됨] 사진 업로드 기능은 아래 프로필 수정 밑으로 이동했습니다.
-                pass
             
-            with col_img3:
+            # [수정] 로그아웃 버튼용 상단 행
+            col_top_spacer, col_top_logout = st.columns([5, 1])
+            with col_top_logout:
                 if st.button("로그아웃", key="logout_btn", type="secondary"):
                     st.session_state['logged_in'] = False
                     st.session_state['user_info'] = {}
                     st.rerun()
 
-            st.markdown(f"<h2>{user_name} <span style='font-size:16px; color:#8B95A1'>({user_id})</span></h2>", unsafe_allow_html=True)
-            st.caption(st.session_state['my_profile']['vision'] if st.session_state['my_profile']['vision'] else "나의 비전이 없습니다.")
+            # [수정] 성명과 사진이 들어갈 자리를 나란히 배치 (성명 옆에 사진)
+            col_profile_info, col_profile_img = st.columns([3, 1])
+            
+            with col_profile_info:
+                st.markdown(f"<h2>{user_name} <span style='font-size:16px; color:#8B95A1'>({user_id})</span></h2>", unsafe_allow_html=True)
+                st.caption(st.session_state['my_profile']['vision'] if st.session_state['my_profile']['vision'] else "나의 비전이 없습니다.")
+            
+            with col_profile_img:
+                # [핵심] 여기에 사진이 뜰 자리(Placeholder)를 미리 잡아둠
+                profile_img_placeholder = st.empty()
+            
             st.markdown("</div>", unsafe_allow_html=True)
         st.markdown("---")
 
@@ -145,11 +152,12 @@ def render_ui():
             save_current_user_state(user_id) 
             st.rerun()
         
-        # [위치 이동] 사진 업로드 기능이 여기로 왔습니다.
         st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
         uploaded_file = st.file_uploader("사진", type=['jpg', 'png'], key="profile_upload", label_visibility="collapsed")
+        
         if uploaded_file is not None:
-             st.image(uploaded_file, width=120)
+             # [핵심] 업로드된 사진을 아까 만들어둔 상단 자리(placeholder)에 표시
+             profile_img_placeholder.image(uploaded_file, width=120)
 
         st.divider()
         if st.button("⛏️ 채굴 (Daily Mining)", type="primary"):
