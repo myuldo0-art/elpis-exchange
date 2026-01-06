@@ -112,6 +112,25 @@ def quick_sell_popup(code, price, name):
             else:
                 st.error(msg)
 
+# --- [팝업: 프로필 상세 보기] ---
+@st.dialog("👤 프로필 상세")
+def profile_detail_popup(target_id):
+    target_name = st.session_state['user_names'].get(target_id, target_id)
+    
+    p_vision = "정보 없음"
+    p_sns = "정보 없음"
+    if target_id in st.session_state['user_states']:
+        p_vision = st.session_state['user_states'][target_id]['my_profile']['vision']
+        p_sns = st.session_state['user_states'][target_id]['my_profile']['sns']
+    elif target_id in st.session_state['market_data']:
+            p_vision = st.session_state['market_data'][target_id].get('desc', '정보 없음')
+    
+    st.markdown(f"<div class='profile-card'><h2>{target_name} <small>({target_id})</small></h2><hr style='border: 0; border-top: 1px solid #F2F4F6;'><p><b>Vision:</b> {p_vision}</p><p><b>SNS:</b> {p_sns}</p></div>", unsafe_allow_html=True)
+    
+    if st.button("닫기 (Close)", type="secondary", use_container_width=True):
+        st.session_state['view_profile_id'] = None
+        st.rerun()
+
 # --- [UI 렌더링 메인 함수] ---
 def render_ui():
     user_id = st.session_state['user_info'].get('id', 'Guest')
@@ -124,21 +143,7 @@ def render_ui():
         st.session_state['my_profile']['likes'] = []
 
     if st.session_state.get('view_profile_id'):
-        target_id = st.session_state['view_profile_id']
-        target_name = st.session_state['user_names'].get(target_id, target_id)
-        
-        p_vision = "정보 없음"
-        p_sns = "정보 없음"
-        if target_id in st.session_state['user_states']:
-            p_vision = st.session_state['user_states'][target_id]['my_profile']['vision']
-            p_sns = st.session_state['user_states'][target_id]['my_profile']['sns']
-        elif target_id in st.session_state['market_data']:
-             p_vision = st.session_state['market_data'][target_id].get('desc', '정보 없음')
-        
-        st.markdown(f"<div class='profile-card'><h2>👤 {target_name} <small>({target_id})</small></h2><hr style='border: 0; border-top: 1px solid #F2F4F6;'><p><b>Vision:</b> {p_vision}</p><p><b>SNS:</b> {p_sns}</p></div>", unsafe_allow_html=True)
-        if st.button("닫기 (Close)", type="secondary"):
-            st.session_state['view_profile_id'] = None
-            st.rerun()
+        profile_detail_popup(st.session_state['view_profile_id'])
             
     tabs = st.tabs(["메인화면", "관심", "현재가", "주문", "잔고", "내역", "거래소"])
 
@@ -270,7 +275,7 @@ def render_ui():
                     r1, r2, r3, r4 = st.columns([4, 3, 2, 1], gap="small")
 
                     with r1:
-                        if st.button(f"{info['name']}", key=f"fav_btn_{code}", type="secondary", use_container_width=True):
+                        if st.button(f"### :violet[{info['name']}]", key=f"fav_btn_{code}", type="secondary", use_container_width=True):
                             st.session_state['view_profile_id'] = code
                             st.session_state['selected_code'] = code 
                             st.rerun()
@@ -353,7 +358,10 @@ def render_ui():
         
         is_me = (target == user_id)
         
-        st.markdown(f"### {market['name']} <span style='font-size:14px; color:gray'>$ELP-{target}</span>", unsafe_allow_html=True)
+        if st.button(f"### :violet[{market['name']}] <span style='font-size:14px; color:gray'>$ELP-{target}</span>", type="secondary", use_container_width=True):
+             st.session_state['view_profile_id'] = target
+             st.rerun()
+
         pc1, pc2 = st.columns(2)
         color_cls = "price-up" if change_pct >= 0 else "price-down"
         pc1.markdown(f"<div class='big-font {color_cls}'>{curr_price:,} ID</div>", unsafe_allow_html=True)
@@ -535,12 +543,14 @@ def render_ui():
 
         st.markdown("#### ⏳ 미체결 주문 (Pending)")
         
-        # [수정] 미체결 주문 조회 및 취소 기능 구현
         my_pending = [o for o in st.session_state['pending_orders'] if o['user'] == user_id]
         
         if my_pending:
-            # 헤더 표시
-            h1, h2, h3, h4, h5 = st.columns([2, 1, 2, 2, 1.5])
+            # [수정] 모바일에서도 가로로 '표'처럼 보이도록 비율 조정 및 Markdown 적용
+            col_ratios = [1.8, 0.8, 1.2, 1.0, 1.2]
+            
+            # 헤더
+            h1, h2, h3, h4, h5 = st.columns(col_ratios, gap="small")
             h1.markdown("**종목**")
             h2.markdown("**구분**")
             h3.markdown("**가격**")
@@ -549,24 +559,25 @@ def render_ui():
             st.divider()
 
             for i, order in enumerate(my_pending):
-                c1, c2, c3, c4, c5 = st.columns([2, 1, 2, 2, 1.5])
+                c1, c2, c3, c4, c5 = st.columns(col_ratios, gap="small")
                 
-                # 종목명 찾기
                 o_name = order['code']
                 if order['code'] in st.session_state['market_data']:
                     o_name = st.session_state['market_data'][order['code']]['name']
                 
-                c1.text(o_name)
+                # 내용 (Markdown으로 폰트 크기 및 정렬 미세 조정)
+                c1.markdown(f"<div style='padding-top:5px; font-size:13px;'>{o_name}</div>", unsafe_allow_html=True)
                 
+                type_text = "매수" if order['type'] == 'BUY' else "매도"
                 type_color = "red" if order['type'] == 'BUY' else "blue"
-                c2.markdown(f":{type_color}[{order['type']}]")
+                c2.markdown(f"<div style='padding-top:5px; color:{type_color}; font-size:13px; font-weight:bold;'>{type_text}</div>", unsafe_allow_html=True)
                 
-                c3.text(f"{order['price']:,}")
-                c4.text(f"{order['qty']:,}")
+                c3.markdown(f"<div style='padding-top:5px; font-size:13px;'>{order['price']:,}</div>", unsafe_allow_html=True)
+                c4.markdown(f"<div style='padding-top:5px; font-size:13px;'>{order['qty']:,}</div>", unsafe_allow_html=True)
                 
-                # [기능] 취소 버튼 및 로직
+                # 취소 버튼 (제일 오른쪽)
                 if c5.button("취소", key=f"cancel_{i}_{order['code']}"):
-                    # 1. 자산 환불
+                    # 환불 및 취소 로직
                     if order['type'] == 'BUY':
                         refund_cash = order['price'] * order['qty']
                         st.session_state['balance_id'] += refund_cash
@@ -578,16 +589,13 @@ def render_ui():
                                 st.session_state['portfolio'][order['code']] = {'qty': 0, 'avg_price': 0}
                             st.session_state['portfolio'][order['code']]['qty'] += order['qty']
                     
-                    # 2. 대기 목록에서 삭제 (호가창 자동 반영됨)
                     st.session_state['pending_orders'].remove(order)
-                    
-                    # 3. 저장 및 새로고침
                     save_current_user_state(user_id)
-                    st.success("주문이 취소되었습니다.")
+                    st.success("취소 완료")
                     time.sleep(0.5)
                     st.rerun()
                 
-                st.markdown("<hr style='margin: 5px 0; opacity: 0.5;'>", unsafe_allow_html=True)
+                st.markdown("<hr style='margin: 3px 0; opacity: 0.3;'>", unsafe_allow_html=True)
         else:
             st.info("대기 중인 주문이 없습니다.")
 
