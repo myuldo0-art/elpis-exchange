@@ -6,6 +6,36 @@ import time
 from database import save_db
 from logic import place_order, mining, save_current_user_state
 
+# [신규] 황금 동전 이펙트 함수 (st.snow를 변형)
+def falling_coins():
+    st.markdown("""
+    <style>
+    @keyframes falling-coins {
+        0% { transform: translateY(-100vh) rotate(0deg); opacity: 0; }
+        10% { opacity: 1; }
+        90% { opacity: 1; }
+        100% { transform: translateY(100vh) rotate(360deg); opacity: 0; }
+    }
+    .coin {
+        position: fixed;
+        top: -10%;
+        color: #FFD700;
+        font-size: 24px;
+        user-select: none;
+        z-index: 9999;
+        animation: falling-coins 3s linear infinite;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    coins_html = ""
+    for i in range(50):
+        left = random.randint(0, 100)
+        delay = random.uniform(0, 2)
+        coins_html += f'<div class="coin" style="left: {left}%; animation-delay: {delay}s;">🪙</div>'
+    
+    st.markdown(f'{coins_html}', unsafe_allow_html=True)
+
 # --- [수정된 팝업: 간편 매수] ---
 @st.dialog("⚡ 간편 매수 (Quick Buy)")
 def quick_buy_popup(code, price, name):
@@ -87,6 +117,10 @@ def render_ui():
     user_id = st.session_state['user_info'].get('id', 'Guest')
     user_name = st.session_state['user_names'].get(user_id, '사용자')
 
+    # [신규] 사진 캐시용 세션 초기화
+    if 'uploaded_photo_cache' not in st.session_state:
+        st.session_state['uploaded_photo_cache'] = None
+
     if st.session_state.get('view_profile_id'):
         target_id = st.session_state['view_profile_id']
         target_name = st.session_state['user_names'].get(target_id, target_id)
@@ -110,15 +144,15 @@ def render_ui():
         with st.container():
             st.markdown(f"<div style='text-align:center;'>", unsafe_allow_html=True)
             
-            # [수정] 로그아웃 버튼용 상단 행
             col_top_spacer, col_top_logout = st.columns([5, 1])
             with col_top_logout:
                 if st.button("로그아웃", key="logout_btn", type="secondary"):
                     st.session_state['logged_in'] = False
                     st.session_state['user_info'] = {}
+                    # 로그아웃 시 사진 캐시도 비움
+                    st.session_state['uploaded_photo_cache'] = None
                     st.rerun()
 
-            # [수정] 성명과 사진이 들어갈 자리를 나란히 배치 (성명 옆에 사진)
             col_profile_info, col_profile_img = st.columns([3, 1])
             
             with col_profile_info:
@@ -126,7 +160,7 @@ def render_ui():
                 st.caption(st.session_state['my_profile']['vision'] if st.session_state['my_profile']['vision'] else "나의 비전이 없습니다.")
             
             with col_profile_img:
-                # [핵심] 여기에 사진이 뜰 자리(Placeholder)를 미리 잡아둠
+                # [수정] 사진이 뜰 자리(Placeholder)
                 profile_img_placeholder = st.empty()
             
             st.markdown("</div>", unsafe_allow_html=True)
@@ -149,20 +183,36 @@ def render_ui():
         if st.button("저장", type="primary"):
             st.session_state['my_profile']['vision'] = vision
             st.session_state['my_profile']['sns'] = sns
-            save_current_user_state(user_id) 
+            save_current_user_state(user_id)
+            # [중요] 저장 후 리런 시 사진이 사라지지 않게 캐시 유지
             st.rerun()
         
         st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
         uploaded_file = st.file_uploader("사진", type=['jpg', 'png'], key="profile_upload", label_visibility="collapsed")
         
+        # [핵심 로직: 사진 유지 및 표시]
+        photo_to_show = None
         if uploaded_file is not None:
-             # [핵심] 업로드된 사진을 아까 만들어둔 상단 자리(placeholder)에 표시
-             profile_img_placeholder.image(uploaded_file, width=120)
+            # 새 사진이 업로드되면 캐시에 저장하고 표시할 준비
+            st.session_state['uploaded_photo_cache'] = uploaded_file
+            photo_to_show = uploaded_file
+        elif st.session_state['uploaded_photo_cache'] is not None:
+            # 업로더가 비어있어도 캐시에 사진이 있으면 그걸 표시
+            photo_to_show = st.session_state['uploaded_photo_cache']
+            
+        if photo_to_show:
+            # [수정] use_column_width=True로 세로 비율 자연스럽게 표시
+            profile_img_placeholder.image(photo_to_show, use_column_width=True)
 
         st.divider()
         if st.button("⛏️ 채굴 (Daily Mining)", type="primary"):
             ok, reward = mining()
-            if ok: st.balloons(); st.success(f"+{reward:,} ID"); time.sleep(1); st.rerun()
+            if ok: 
+                # [수정] 풍선 대신 황금 동전 이펙트 실행
+                falling_coins()
+                st.success(f"+{reward:,} ID")
+                time.sleep(2) # 이펙트를 즐길 시간 확보
+                st.rerun()
             else: st.warning("이미 채굴했습니다.")
         
         st.divider()
