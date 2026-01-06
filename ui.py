@@ -111,9 +111,8 @@ def render_ui():
             st.markdown(f"<div style='text-align:center;'>", unsafe_allow_html=True)
             col_img1, col_img2, col_img3 = st.columns([1,1,1])
             with col_img2: 
-                uploaded_file = st.file_uploader("사진", type=['jpg', 'png'], key="profile_upload", label_visibility="collapsed")
-                if uploaded_file is not None:
-                     st.image(uploaded_file, width=120) 
+                # [이동됨] 사진 업로드 기능은 아래 프로필 수정 밑으로 이동했습니다.
+                pass
             
             with col_img3:
                 if st.button("로그아웃", key="logout_btn", type="secondary"):
@@ -145,6 +144,13 @@ def render_ui():
             st.session_state['my_profile']['sns'] = sns
             save_current_user_state(user_id) 
             st.rerun()
+        
+        # [위치 이동] 사진 업로드 기능이 여기로 왔습니다.
+        st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
+        uploaded_file = st.file_uploader("사진", type=['jpg', 'png'], key="profile_upload", label_visibility="collapsed")
+        if uploaded_file is not None:
+             st.image(uploaded_file, width=120)
+
         st.divider()
         if st.button("⛏️ 채굴 (Daily Mining)", type="primary"):
             ok, reward = mining()
