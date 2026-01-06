@@ -3,38 +3,51 @@ import pandas as pd
 import datetime
 import plotly.graph_objects as go
 import time
+import random  # [필수] 황금 동전 랜덤 위치 계산용
+
 from database import save_db
 from logic import place_order, mining, save_current_user_state
 
-# [신규] 황금 동전 이펙트 함수 (st.snow를 변형)
+# --- [신규] 황금 동전 이펙트 함수 ---
 def falling_coins():
+    # CSS를 이용한 고급스러운 황금 동전 하강 효과
     st.markdown("""
-    <style>
-    @keyframes falling-coins {
-        0% { transform: translateY(-100vh) rotate(0deg); opacity: 0; }
-        10% { opacity: 1; }
-        90% { opacity: 1; }
-        100% { transform: translateY(100vh) rotate(360deg); opacity: 0; }
-    }
-    .coin {
-        position: fixed;
-        top: -10%;
-        color: #FFD700;
-        font-size: 24px;
-        user-select: none;
-        z-index: 9999;
-        animation: falling-coins 3s linear infinite;
-    }
-    </style>
+        <style>
+        .coin-emitter {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 9999;
+        }
+        .coin-particle {
+            position: absolute;
+            top: -50px;
+            font-size: 30px;
+            animation: fall linear forwards;
+        }
+        @keyframes fall {
+            to {
+                transform: translateY(110vh) rotate(360deg);
+            }
+        }
+        </style>
     """, unsafe_allow_html=True)
     
-    coins_html = ""
-    for i in range(50):
-        left = random.randint(0, 100)
-        delay = random.uniform(0, 2)
-        coins_html += f'<div class="coin" style="left: {left}%; animation-delay: {delay}s;">🪙</div>'
+    placeholder = st.empty()
+    coin_html = '<div class="coin-emitter">'
+    # 동전 30개 생성
+    for _ in range(30):
+        left = random.randint(0, 95)
+        duration = random.uniform(1.5, 3.0)
+        delay = random.uniform(0, 1.5)
+        coin_html += f'<div class="coin-particle" style="left:{left}%; animation: fall {duration}s {delay}s linear forwards;">🪙</div>'
+    coin_html += '</div>'
     
-    st.markdown(f'{coins_html}', unsafe_allow_html=True)
+    placeholder.markdown(coin_html, unsafe_allow_html=True)
+    time.sleep(0.1) # 렌더링 시간 확보
 
 # --- [수정된 팝업: 간편 매수] ---
 @st.dialog("⚡ 간편 매수 (Quick Buy)")
@@ -117,7 +130,7 @@ def render_ui():
     user_id = st.session_state['user_info'].get('id', 'Guest')
     user_name = st.session_state['user_names'].get(user_id, '사용자')
 
-    # [신규] 사진 캐시용 세션 초기화
+    # [신규] 사진 캐시용 세션 초기화 (없으면 생성)
     if 'uploaded_photo_cache' not in st.session_state:
         st.session_state['uploaded_photo_cache'] = None
 
@@ -144,23 +157,25 @@ def render_ui():
         with st.container():
             st.markdown(f"<div style='text-align:center;'>", unsafe_allow_html=True)
             
+            # 상단 로그아웃 버튼
             col_top_spacer, col_top_logout = st.columns([5, 1])
             with col_top_logout:
                 if st.button("로그아웃", key="logout_btn", type="secondary"):
                     st.session_state['logged_in'] = False
                     st.session_state['user_info'] = {}
-                    # 로그아웃 시 사진 캐시도 비움
+                    # 로그아웃 시 캐시도 초기화
                     st.session_state['uploaded_photo_cache'] = None
                     st.rerun()
 
-            col_profile_info, col_profile_img = st.columns([3, 1])
+            # [레이아웃 수정] 성명(좌) + 사진(우) 배치
+            col_profile_info, col_profile_img = st.columns([3, 1.2]) # 사진 영역 약간 확보
             
             with col_profile_info:
                 st.markdown(f"<h2>{user_name} <span style='font-size:16px; color:#8B95A1'>({user_id})</span></h2>", unsafe_allow_html=True)
                 st.caption(st.session_state['my_profile']['vision'] if st.session_state['my_profile']['vision'] else "나의 비전이 없습니다.")
             
             with col_profile_img:
-                # [수정] 사진이 뜰 자리(Placeholder)
+                # 사진이 뜰 자리 (Placeholder)
                 profile_img_placeholder = st.empty()
             
             st.markdown("</div>", unsafe_allow_html=True)
@@ -180,38 +195,37 @@ def render_ui():
         st.subheader("📝 프로필 수정")
         vision = st.text_area("비전", value=st.session_state['my_profile']['vision'])
         sns = st.text_input("SNS", value=st.session_state['my_profile']['sns'])
+        
+        # [기능 수정] 저장 버튼 눌러도 사진 유지되도록 처리
         if st.button("저장", type="primary"):
             st.session_state['my_profile']['vision'] = vision
             st.session_state['my_profile']['sns'] = sns
-            save_current_user_state(user_id)
-            # [중요] 저장 후 리런 시 사진이 사라지지 않게 캐시 유지
+            save_current_user_state(user_id) 
             st.rerun()
         
         st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
         uploaded_file = st.file_uploader("사진", type=['jpg', 'png'], key="profile_upload", label_visibility="collapsed")
         
-        # [핵심 로직: 사진 유지 및 표시]
+        # [로직] 사진 업로드 및 캐시 유지 로직
         photo_to_show = None
         if uploaded_file is not None:
-            # 새 사진이 업로드되면 캐시에 저장하고 표시할 준비
             st.session_state['uploaded_photo_cache'] = uploaded_file
             photo_to_show = uploaded_file
         elif st.session_state['uploaded_photo_cache'] is not None:
-            # 업로더가 비어있어도 캐시에 사진이 있으면 그걸 표시
             photo_to_show = st.session_state['uploaded_photo_cache']
             
         if photo_to_show:
-            # [수정] use_column_width=True로 세로 비율 자연스럽게 표시
+            # use_column_width=True 로 세로 비율 꽉 차게 표시
             profile_img_placeholder.image(photo_to_show, use_column_width=True)
 
         st.divider()
         if st.button("⛏️ 채굴 (Daily Mining)", type="primary"):
             ok, reward = mining()
             if ok: 
-                # [수정] 풍선 대신 황금 동전 이펙트 실행
+                # [효과 변경] 황금 동전 이펙트
                 falling_coins()
                 st.success(f"+{reward:,} ID")
-                time.sleep(2) # 이펙트를 즐길 시간 확보
+                time.sleep(2) 
                 st.rerun()
             else: st.warning("이미 채굴했습니다.")
         
