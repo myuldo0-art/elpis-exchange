@@ -8,37 +8,24 @@ import random
 from database import save_db
 from logic import place_order, mining, save_current_user_state
 
-# --- [신규] 황금 동전 이펙트 함수 ---
+# --- [황금 동전 이펙트 함수] ---
 def falling_coins():
-    # CSS를 이용한 고급스러운 황금 동전 하강 효과
     st.markdown("""
         <style>
         .coin-emitter {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-            z-index: 9999;
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 9999;
         }
         .coin-particle {
-            position: absolute;
-            top: -50px;
-            font-size: 30px;
+            position: absolute; top: -50px; font-size: 30px;
             animation: fall linear forwards;
         }
-        @keyframes fall {
-            to {
-                transform: translateY(110vh) rotate(360deg);
-            }
-        }
+        @keyframes fall { to { transform: translateY(110vh) rotate(360deg); } }
         </style>
     """, unsafe_allow_html=True)
     
     placeholder = st.empty()
     coin_html = '<div class="coin-emitter">'
-    # 동전 30개 생성
     for _ in range(30):
         left = random.randint(0, 95)
         duration = random.uniform(1.5, 3.0)
@@ -47,9 +34,9 @@ def falling_coins():
     coin_html += '</div>'
     
     placeholder.markdown(coin_html, unsafe_allow_html=True)
-    time.sleep(0.1) # 렌더링 시간 확보
+    time.sleep(0.1)
 
-# --- [수정된 팝업: 간편 매수] ---
+# --- [팝업: 간편 매수] ---
 @st.dialog("⚡ 간편 매수 (Quick Buy)")
 def quick_buy_popup(code, price, name):
     st.markdown(f"<h3 style='text-align:center;'>{name}</h3>", unsafe_allow_html=True)
@@ -84,7 +71,7 @@ def quick_buy_popup(code, price, name):
         else:
             st.error(msg)
 
-# --- [수정된 팝업: 간편 매도] ---
+# --- [팝업: 간편 매도] ---
 @st.dialog("⚡ 간편 매도 (Quick Sell)")
 def quick_sell_popup(code, price, name):
     user_id = st.session_state['user_info'].get('id')
@@ -130,11 +117,9 @@ def render_ui():
     user_id = st.session_state['user_info'].get('id', 'Guest')
     user_name = st.session_state['user_names'].get(user_id, '사용자')
 
-    # [신규] 사진 캐시용 세션 초기화 (없으면 생성)
     if 'uploaded_photo_cache' not in st.session_state:
         st.session_state['uploaded_photo_cache'] = None
 
-    # [수정] 개인 관심 목록(likes) 초기화 (없으면 생성)
     if 'likes' not in st.session_state['my_profile']:
         st.session_state['my_profile']['likes'] = []
 
@@ -160,28 +145,20 @@ def render_ui():
     with tabs[0]:
         with st.container():
             st.markdown(f"<div style='text-align:center;'>", unsafe_allow_html=True)
-            
-            # 상단 로그아웃 버튼
             col_top_spacer, col_top_logout = st.columns([5, 1])
             with col_top_logout:
                 if st.button("로그아웃", key="logout_btn", type="secondary"):
                     st.session_state['logged_in'] = False
                     st.session_state['user_info'] = {}
-                    # 로그아웃 시 캐시도 초기화
                     st.session_state['uploaded_photo_cache'] = None
                     st.rerun()
 
-            # [UI 고급화] 성명(좌) + 사진(우) 배치 비율 조정
             col_profile_info, col_profile_img = st.columns([2.8, 1.2]) 
-            
             with col_profile_info:
                 st.markdown(f"<h2>{user_name} <span style='font-size:16px; color:#8B95A1'>({user_id})</span></h2>", unsafe_allow_html=True)
                 st.caption(st.session_state['my_profile']['vision'] if st.session_state['my_profile']['vision'] else "나의 비전이 없습니다.")
-            
             with col_profile_img:
-                # 사진이 뜰 자리 (Placeholder)
                 profile_img_placeholder = st.empty()
-            
             st.markdown("</div>", unsafe_allow_html=True)
         st.markdown("---")
 
@@ -200,7 +177,6 @@ def render_ui():
         vision = st.text_area("비전", value=st.session_state['my_profile']['vision'])
         sns = st.text_input("SNS", value=st.session_state['my_profile']['sns'])
         
-        # [기능 유지] 저장 버튼 눌러도 사진 유지되도록 처리
         if st.button("저장", type="primary"):
             st.session_state['my_profile']['vision'] = vision
             st.session_state['my_profile']['sns'] = sns
@@ -210,7 +186,6 @@ def render_ui():
         st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
         uploaded_file = st.file_uploader("사진", type=['jpg', 'png'], key="profile_upload", label_visibility="collapsed")
         
-        # [UI 고급화 수정 적용]
         photo_to_show = None
         if uploaded_file is not None:
             st.session_state['uploaded_photo_cache'] = uploaded_file
@@ -219,14 +194,12 @@ def render_ui():
             photo_to_show = st.session_state['uploaded_photo_cache']
             
         if photo_to_show:
-            # [핵심 수정] width=110 으로 고정하여 '거대한 사진' 방지
             profile_img_placeholder.image(photo_to_show, width=110)
 
         st.divider()
         if st.button("⛏️ 채굴 (Daily Mining)", type="primary"):
             ok, reward = mining()
             if ok: 
-                # [효과 변경] 황금 동전 이펙트
                 falling_coins()
                 st.success(f"+{reward:,} ID")
                 time.sleep(2) 
@@ -234,9 +207,9 @@ def render_ui():
             else: st.warning("이미 채굴했습니다.")
         
         st.divider()
-        st.subheader(f"📨 {user_name}님에게 남겨진 메시지")
-        my_messages = [m for m in st.session_state['board_messages'] if m['code'] == user_id]
+        st.markdown(f"<div style='font-size:18px; font-weight:700; color:#191F28; margin-bottom:10px;'>📨 {user_name}님에게 남겨진 메시지</div>", unsafe_allow_html=True)
         
+        my_messages = [m for m in st.session_state['board_messages'] if m['code'] == user_id]
         if my_messages:
             for m in my_messages:
                 st.markdown(f"<div class='chat-box'><div class='chat-user'>{m['user']} <span style='font-weight:normal; color:#888;'>님이 작성</span></div><div class='chat-msg'>{m['msg']}</div><div class='chat-time'>{m['time']}</div></div>", unsafe_allow_html=True)
@@ -246,14 +219,14 @@ def render_ui():
     with tabs[1]:
         st.markdown("<h4 style='margin-bottom: 15px; font-weight: 800;'>관심 종목</h4>", unsafe_allow_html=True)
 
+        # [수정] 헤더 글자 크기 확대 (12px -> 15px)
         h1, h2, h3, h4 = st.columns([4, 3, 2, 1], gap="small")
-        h1.markdown("<span style='color:#8B95A1; font-size:12px; padding-left:4px;'>종목명</span>", unsafe_allow_html=True)
-        h2.markdown("<span style='color:#8B95A1; font-size:12px; display:block; text-align:right;'>현재가</span>", unsafe_allow_html=True)
-        h3.markdown("<span style='color:#8B95A1; font-size:12px; display:block; text-align:right;'>등락</span>", unsafe_allow_html=True)
+        h1.markdown("<span style='color:#8B95A1; font-size:15px; padding-left:4px;'>종목명</span>", unsafe_allow_html=True)
+        h2.markdown("<span style='color:#8B95A1; font-size:15px; display:block; text-align:right;'>현재가</span>", unsafe_allow_html=True)
+        h3.markdown("<span style='color:#8B95A1; font-size:15px; display:block; text-align:right;'>등락</span>", unsafe_allow_html=True)
         
         st.markdown("<hr style='margin: 5px 0 0 0; border: 0; border-top: 1px solid #E5E8EB;'>", unsafe_allow_html=True)
 
-        # [수정] 개인의 'likes' 리스트를 사용하여 본인 것만 표시
         targets = st.session_state['my_profile']['likes']
         targets = [t for t in targets if t != user_id]
 
@@ -279,25 +252,27 @@ def render_ui():
                     r1, r2, r3, r4 = st.columns([4, 3, 2, 1], gap="small")
 
                     with r1:
-                        if st.button(f"{info['name']}", key=f"fav_btn_{code}", type="secondary", use_container_width=True):
+                        # [수정] 종목명 버튼: 클릭 가능함을 시각적으로 알리기 위해 보라색(:violet) 및 크기 확대(###) 적용
+                        if st.button(f"### :violet[{info['name']}]", key=f"fav_btn_{code}", type="secondary", use_container_width=True):
                             st.session_state['view_profile_id'] = code
                             st.session_state['selected_code'] = code 
                             st.rerun()
                     with r2:
+                        # [수정] 가격 폰트 크기 확대 (13px -> 18px)
                         st.markdown(f"""
-                            <div style='text-align:right; padding-top: 10px; font-weight:700; font-size:13px; color:{color}; letter-spacing:-0.5px;'>
+                            <div style='text-align:right; padding-top: 10px; font-weight:700; font-size:18px; color:{color}; letter-spacing:-0.5px;'>
                                 {c_price:,}
                             </div>
                         """, unsafe_allow_html=True)
                     with r3:
+                        # [수정] 등락률 폰트 크기 확대 (11px -> 15px)
                         st.markdown(f"""
-                            <div style='margin-top: 8px; float:right; background-color: {bg_color}; color: {color}; padding: 2px 4px; border-radius: 4px; font-size: 11px; font-weight: 600; white-space: nowrap;'>
+                            <div style='margin-top: 8px; float:right; background-color: {bg_color}; color: {color}; padding: 2px 4px; border-radius: 4px; font-size:15px; font-weight: 600; white-space: nowrap;'>
                                 {abs(c_change)}%
                             </div>
                         """, unsafe_allow_html=True)
                     with r4:
                         if st.button("✕", key=f"del_{code}"): 
-                            # [수정] 개인 리스트(likes)에서 삭제
                             st.session_state['my_profile']['likes'].remove(code)
                             save_current_user_state(user_id)
                             st.rerun()
@@ -305,7 +280,6 @@ def render_ui():
                     st.markdown("<hr style='margin: 6px 0 0 0; border: 0; border-top: 1px solid #F2F4F6;'>", unsafe_allow_html=True)
 
     with tabs[2]:
-        # [DESIGN FIX V1.9.2] 호가창 텍스트 색상 강제 적용
         st.markdown("""
             <style>
             div[data-testid="column"] { padding: 0px !important; }
@@ -347,7 +321,6 @@ def render_ui():
                 if search_q in k or search_q in v['name']:
                     st.session_state['selected_code'] = k
                     
-                    # [수정] 검색 시 개인 리스트(likes)에 추가
                     if k not in st.session_state['my_profile']['likes']:
                         st.session_state['my_profile']['likes'].append(k)
                         save_current_user_state(user_id)
@@ -501,9 +474,6 @@ def render_ui():
                         st.session_state['market_data'][user_id] = {'name': user_id, 'price': ipo_price, 'change': 0.0, 'desc': '신규 상장', 'history': [ipo_price]}
                     
                     st.session_state['pending_orders'].append({'code': user_id, 'type': 'SELL', 'price': ipo_price, 'qty': ipo_qty, 'user': user_id})
-                    
-                    # [수정] 상장 시 내 관심 목록 추가 로직 삭제됨 (요청 반영)
-                    # if user_id not in st.session_state['my_profile']['likes']: ... 삭제
                     
                     save_current_user_state(user_id) 
                     st.success("상장 주문 등록 완료! (매수자가 나타나면 체결됩니다)"); time.sleep(1.5); st.rerun()
