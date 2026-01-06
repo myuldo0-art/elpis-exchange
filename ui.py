@@ -478,7 +478,6 @@ def render_ui():
         with st.expander("📢 내 엘피스 상장 (IPO)", expanded=True):
             locked = st.session_state['my_elpis_locked']
             st.markdown(f"**보유(Lock): {locked:,} 주**")
-            # [유지] 실시간 예수금 표시
             st.markdown(f"**현재 예수금(ID): {st.session_state['balance_id']:,.0f} ID**")
             
             c1, c2 = st.columns(2)
@@ -535,11 +534,60 @@ def render_ui():
         st.subheader("📜 나의 거래 내역")
 
         st.markdown("#### ⏳ 미체결 주문 (Pending)")
+        
+        # [수정] 미체결 주문 조회 및 취소 기능 구현
         my_pending = [o for o in st.session_state['pending_orders'] if o['user'] == user_id]
         
         if my_pending:
-            df_pending = pd.DataFrame(my_pending)
-            st.dataframe(df_pending[['code', 'type', 'price', 'qty']], use_container_width=True)
+            # 헤더 표시
+            h1, h2, h3, h4, h5 = st.columns([2, 1, 2, 2, 1.5])
+            h1.markdown("**종목**")
+            h2.markdown("**구분**")
+            h3.markdown("**가격**")
+            h4.markdown("**수량**")
+            h5.markdown("**관리**")
+            st.divider()
+
+            for i, order in enumerate(my_pending):
+                c1, c2, c3, c4, c5 = st.columns([2, 1, 2, 2, 1.5])
+                
+                # 종목명 찾기
+                o_name = order['code']
+                if order['code'] in st.session_state['market_data']:
+                    o_name = st.session_state['market_data'][order['code']]['name']
+                
+                c1.text(o_name)
+                
+                type_color = "red" if order['type'] == 'BUY' else "blue"
+                c2.markdown(f":{type_color}[{order['type']}]")
+                
+                c3.text(f"{order['price']:,}")
+                c4.text(f"{order['qty']:,}")
+                
+                # [기능] 취소 버튼 및 로직
+                if c5.button("취소", key=f"cancel_{i}_{order['code']}"):
+                    # 1. 자산 환불
+                    if order['type'] == 'BUY':
+                        refund_cash = order['price'] * order['qty']
+                        st.session_state['balance_id'] += refund_cash
+                    else: # SELL
+                        if order['code'] == user_id:
+                            st.session_state['my_elpis_locked'] += order['qty']
+                        else:
+                            if order['code'] not in st.session_state['portfolio']:
+                                st.session_state['portfolio'][order['code']] = {'qty': 0, 'avg_price': 0}
+                            st.session_state['portfolio'][order['code']]['qty'] += order['qty']
+                    
+                    # 2. 대기 목록에서 삭제 (호가창 자동 반영됨)
+                    st.session_state['pending_orders'].remove(order)
+                    
+                    # 3. 저장 및 새로고침
+                    save_current_user_state(user_id)
+                    st.success("주문이 취소되었습니다.")
+                    time.sleep(0.5)
+                    st.rerun()
+                
+                st.markdown("<hr style='margin: 5px 0; opacity: 0.5;'>", unsafe_allow_html=True)
         else:
             st.info("대기 중인 주문이 없습니다.")
 
