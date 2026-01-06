@@ -1,8 +1,9 @@
 import streamlit as st
 import time
-import logic  # logic.py의 함수들을 사용하기 위해 임포트
+import base64
 
-# 1. [유지/변경] 황금 동전 이펙트 함수
+# [주의] 맨 위에서 import logic을 하지 않습니다. (에러 원인 제거)
+
 def falling_coins_effect():
     st.markdown(
         """
@@ -42,7 +43,7 @@ def falling_coins_effect():
     )
     st.toast("🪙 황금 동전이 쏟아집니다! 채굴 성공! 🪙", icon="💰")
 
-# 2. [유지/변경] 프로필 표시 함수 (사진 소실 방지 및 세로 보기 적용)
+
 def display_profile(user_data, update_callback):
     st.markdown("### 👤 내 프로필")
     
@@ -54,7 +55,7 @@ def display_profile(user_data, update_callback):
         st.markdown("#### 프로필 사진")
         uploaded_file = st.file_uploader("사진 변경 (선택사항)", type=['png', 'jpg', 'jpeg'])
         
-        # 이미지 미리보기 (세로 비율 유지)
+        # 이미지 미리보기
         if uploaded_file is not None:
             st.image(uploaded_file, caption="새로 업로드된 사진", width=300)
         elif current_image is not None:
@@ -65,12 +66,10 @@ def display_profile(user_data, update_callback):
         submitted = st.form_submit_button("프로필 수정 저장")
         
         if submitted:
-            # 사진 소실 방지 로직
             final_image_data = current_image 
             if uploaded_file is not None:
                 final_image_data = uploaded_file.getvalue()
             
-            # logic.py의 업데이트 함수 호출
             success = update_callback(user_data['username'], new_vision, final_image_data)
             
             if success:
@@ -80,7 +79,7 @@ def display_profile(user_data, update_callback):
             else:
                 st.error("업데이트 중 오류가 발생했습니다.")
 
-# 3. [유지/변경] 채굴 화면 함수 (황금 동전 이펙트 적용)
+
 def display_mining(user_data, mining_callback):
     st.markdown("### ⛏️ 엘피스 채굴하기")
     st.write(f"현재 보유 자산: **{user_data.get('assets', 0):,} KRW**")
@@ -89,11 +88,10 @@ def display_mining(user_data, mining_callback):
         with st.spinner("블록체인 네트워크 연결 중..."):
             time.sleep(1.5)
             
-            # logic.py의 채굴 함수 호출
             earned = mining_callback(user_data['username'])
             
             if earned > 0:
-                falling_coins_effect() # 황금 동전 효과
+                falling_coins_effect()
                 
                 st.markdown(f"""
                 <div style="padding:20px; border-radius:10px; background-color:#f0f2f6; text-align:center; border: 2px solid #FFD700;">
@@ -105,15 +103,16 @@ def display_mining(user_data, mining_callback):
             else:
                 st.warning("채굴 쿨타임 중이거나 오류가 발생했습니다.")
 
-# 4. [복구됨] 메인 UI 렌더링 함수 (이 부분이 빠져서 에러가 났습니다)
+
 def render_ui(current_user):
-    # 사이드바 메뉴
+    # [핵심 수정] logic 모듈을 함수 안에서 import 합니다.
+    # 이렇게 하면 파일이 로딩될 때 충돌(순환 참조)이 발생하지 않습니다.
+    import logic
+    
     menu = st.sidebar.radio("메뉴", ["채굴(Mining)", "프로필(Profile)"])
     
     if menu == "채굴(Mining)":
-        # logic.process_mining 함수가 있다고 가정 (없으면 logic.py 확인 필요)
         display_mining(current_user, logic.process_mining)
         
     elif menu == "프로필(Profile)":
-        # logic.update_profile 함수가 있다고 가정
         display_profile(current_user, logic.update_profile)
