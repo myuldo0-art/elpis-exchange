@@ -3,14 +3,13 @@ import pandas as pd
 import datetime
 import plotly.graph_objects as go
 import time
-import random  # [필수] 황금 동전 랜덤 위치 계산용
+import random 
 
 from database import save_db
 from logic import place_order, mining, save_current_user_state
 
-# --- [신규] 황금 동전 이펙트 함수 ---
+# --- [황금 동전 이펙트 함수] ---
 def falling_coins():
-    # CSS를 이용한 고급스러운 황금 동전 하강 효과
     st.markdown("""
         <style>
         .coin-emitter {
@@ -49,7 +48,7 @@ def falling_coins():
     placeholder.markdown(coin_html, unsafe_allow_html=True)
     time.sleep(0.1) # 렌더링 시간 확보
 
-# --- [수정된 팝업: 간편 매수] ---
+# --- [간편 매수 팝업] ---
 @st.dialog("⚡ 간편 매수 (Quick Buy)")
 def quick_buy_popup(code, price, name):
     st.markdown(f"<h3 style='text-align:center;'>{name}</h3>", unsafe_allow_html=True)
@@ -84,7 +83,7 @@ def quick_buy_popup(code, price, name):
         else:
             st.error(msg)
 
-# --- [수정된 팝업: 간편 매도] ---
+# --- [간편 매도 팝업] ---
 @st.dialog("⚡ 간편 매도 (Quick Sell)")
 def quick_sell_popup(code, price, name):
     user_id = st.session_state['user_info'].get('id')
@@ -130,10 +129,11 @@ def render_ui():
     user_id = st.session_state['user_info'].get('id', 'Guest')
     user_name = st.session_state['user_names'].get(user_id, '사용자')
 
-    # [신규] 사진 캐시용 세션 초기화 (없으면 생성)
+    # 사진 캐시용 세션 초기화
     if 'uploaded_photo_cache' not in st.session_state:
         st.session_state['uploaded_photo_cache'] = None
 
+    # 다른 사용자 프로필 보기 (모달)
     if st.session_state.get('view_profile_id'):
         target_id = st.session_state['view_profile_id']
         target_name = st.session_state['user_names'].get(target_id, target_id)
@@ -153,93 +153,189 @@ def render_ui():
             
     tabs = st.tabs(["메인화면", "관심", "현재가", "주문", "잔고", "내역", "거래소"])
 
+    # [수정] 메인 화면 (Tab 0) 전면 디자인 리뉴얼
     with tabs[0]:
-        with st.container():
-            st.markdown(f"<div style='text-align:center;'>", unsafe_allow_html=True)
-            
-            # 상단 로그아웃 버튼
-            col_top_spacer, col_top_logout = st.columns([5, 1])
-            with col_top_logout:
-                if st.button("로그아웃", key="logout_btn", type="secondary"):
-                    st.session_state['logged_in'] = False
-                    st.session_state['user_info'] = {}
-                    # 로그아웃 시 캐시도 초기화
-                    st.session_state['uploaded_photo_cache'] = None
-                    st.rerun()
+        # 메인 대시보드 전용 CSS (카드 UI, 그림자, 타이포그래피)
+        st.markdown("""
+        <style>
+            /* 메인 카드 컨테이너 디자인 */
+            .main-card {
+                background-color: #FFFFFF;
+                border-radius: 20px;
+                padding: 24px;
+                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+                margin-bottom: 16px;
+                border: 1px solid #F2F4F6;
+            }
+            /* 자산 표시 텍스트 */
+            .asset-label {
+                color: #8B95A1;
+                font-size: 14px;
+                font-weight: 500;
+                margin-bottom: 4px;
+            }
+            .asset-value-main {
+                color: #191F28;
+                font-size: 32px;
+                font-weight: 800;
+                letter-spacing: -1px;
+            }
+            .asset-value-sub {
+                color: #333D4B;
+                font-size: 18px;
+                font-weight: 700;
+            }
+            /* 프로필 섹션 스타일 */
+            .profile-header {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+            }
+            .user-welcome {
+                font-size: 22px;
+                font-weight: 700;
+                color: #191F28;
+            }
+            .user-id-badge {
+                background-color: #F2F4F6;
+                color: #4E5968;
+                padding: 4px 8px;
+                border-radius: 6px;
+                font-size: 12px;
+                font-weight: 600;
+            }
+            /* 메시지 카드 스타일 */
+            .msg-card {
+                background-color: #F9FAFB;
+                border-radius: 12px;
+                padding: 12px 16px;
+                margin-bottom: 8px;
+                border-left: 4px solid #3182F6;
+            }
+        </style>
+        """, unsafe_allow_html=True)
 
-            # [UI 고급화] 성명(좌) + 사진(우) 배치 비율 조정
-            # 2.8 : 1.2 비율로 텍스트 공간을 확보하고 사진 공간을 적절히 제한함
-            col_profile_info, col_profile_img = st.columns([2.8, 1.2]) 
-            
-            with col_profile_info:
-                st.markdown(f"<h2>{user_name} <span style='font-size:16px; color:#8B95A1'>({user_id})</span></h2>", unsafe_allow_html=True)
-                st.caption(st.session_state['my_profile']['vision'] if st.session_state['my_profile']['vision'] else "나의 비전이 없습니다.")
-            
-            with col_profile_img:
-                # 사진이 뜰 자리 (Placeholder)
-                profile_img_placeholder = st.empty()
-            
-            st.markdown("</div>", unsafe_allow_html=True)
-        st.markdown("---")
+        # 1. [상단 헤더 영역] 프로필 요약 + 로그아웃
+        col_header_l, col_header_r = st.columns([4, 1])
+        with col_header_l:
+            st.markdown(f"""
+            <div class='profile-header'>
+                <div>
+                    <span class='user-welcome'>안녕하세요, {user_name}님</span>
+                    <span class='user-id-badge'>{user_id}</span>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            if st.session_state['my_profile']['vision']:
+                st.caption(f"🚀 {st.session_state['my_profile']['vision']}")
+            else:
+                st.caption("✨ 당신의 금융 비전을 설정해보세요.")
+        
+        with col_header_r:
+            if st.button("로그아웃", key="logout_btn_main", type="secondary"):
+                st.session_state['logged_in'] = False
+                st.session_state['user_info'] = {}
+                st.session_state['uploaded_photo_cache'] = None
+                st.rerun()
 
+        st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+
+        # 2. [자산 대시보드 카드]
         total_asset = st.session_state['balance_id']
         for c, d in st.session_state['portfolio'].items():
             total_asset += (d['qty'] * st.session_state['market_data'][c]['price'])
 
-        with st.container():
-            c1, c2, c3 = st.columns([2, 1, 1])
-            c1.markdown(f"### 💰 총 자산<br><span style='color:#333D4B; font-size:24px; font-weight:bold'>{total_asset:,.0f} ID</span>", unsafe_allow_html=True)
-            c2.metric("보유 이드", f"{st.session_state['balance_id']:,.0f}")
-            c3.metric("내 엘피스", f"{st.session_state['my_elpis_locked']:,}")
-        st.markdown("---")
+        st.markdown("<div class='main-card'>", unsafe_allow_html=True)
+        st.markdown("<div class='asset-label'>총 보유 자산</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='asset-value-main'>{total_asset:,.0f} ID</div>", unsafe_allow_html=True)
         
-        st.subheader("📝 프로필 수정")
-        vision = st.text_area("비전", value=st.session_state['my_profile']['vision'])
-        sns = st.text_input("SNS", value=st.session_state['my_profile']['sns'])
+        st.markdown("<hr style='border: 0; border-top: 1px dashed #E5E8EB; margin: 16px 0;'>", unsafe_allow_html=True)
         
-        # [기능 유지] 저장 버튼 눌러도 사진 유지되도록 처리
-        if st.button("저장", type="primary"):
-            st.session_state['my_profile']['vision'] = vision
-            st.session_state['my_profile']['sns'] = sns
-            save_current_user_state(user_id) 
-            st.rerun()
-        
-        st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
-        uploaded_file = st.file_uploader("사진", type=['jpg', 'png'], key="profile_upload", label_visibility="collapsed")
-        
-        # [UI 고급화 수정 적용]
-        photo_to_show = None
-        if uploaded_file is not None:
-            st.session_state['uploaded_photo_cache'] = uploaded_file
-            photo_to_show = uploaded_file
-        elif st.session_state['uploaded_photo_cache'] is not None:
-            photo_to_show = st.session_state['uploaded_photo_cache']
-            
-        if photo_to_show:
-            # [핵심 수정] width=110 으로 고정하여 '거대한 사진' 방지
-            # use_column_width=True 제거 -> 모바일에서도 단정한 여권사진 크기로 나옴
-            profile_img_placeholder.image(photo_to_show, width=110)
+        c_asset1, c_asset2 = st.columns(2)
+        with c_asset1:
+            st.markdown("<div class='asset-label'>보유 현금</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='asset-value-sub' style='color:#3182F6'>{st.session_state['balance_id']:,.0f}</div>", unsafe_allow_html=True)
+        with c_asset2:
+            st.markdown("<div class='asset-label'>잠긴 자산 (Locked)</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='asset-value-sub' style='color:#8B95A1'>{st.session_state['my_elpis_locked']:,} ELP</div>", unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
 
-        st.divider()
-        if st.button("⛏️ 채굴 (Daily Mining)", type="primary"):
-            ok, reward = mining()
-            if ok: 
-                # [효과 변경] 황금 동전 이펙트
-                falling_coins()
-                st.success(f"+{reward:,} ID")
-                time.sleep(2) 
-                st.rerun()
-            else: st.warning("이미 채굴했습니다.")
+        # 3. [액션 & 정보 카드] 채굴 및 알림
+        col_main_L, col_main_R = st.columns([1.2, 1])
+
+        with col_main_L:
+            # 채굴 섹션
+            st.markdown("<div class='main-card' style='height: 100%;'>", unsafe_allow_html=True)
+            st.markdown("<h4 style='margin-top:0;'>⛏️ Daily Mining</h4>", unsafe_allow_html=True)
+            st.caption("매일 접속하여 100,000 ID를 채굴하세요.")
+            st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
+            
+            if st.button("채굴 시작하기", type="primary", use_container_width=True):
+                ok, reward = mining()
+                if ok: 
+                    falling_coins()
+                    st.success(f"+{reward:,} ID 채굴 성공!")
+                    time.sleep(2) 
+                    st.rerun()
+                else: 
+                    st.warning("오늘은 이미 채굴했습니다. 내일 다시 오세요!")
+            st.markdown("</div>", unsafe_allow_html=True)
+
+        with col_main_R:
+            # 프로필 사진 및 수정
+            with st.container(border=True):
+                st.markdown("<div style='text-align:center; margin-bottom:10px;'><b>내 프로필</b></div>", unsafe_allow_html=True)
+                
+                # 사진 배치
+                col_img_center = st.columns([1, 2, 1])
+                with col_img_center[1]:
+                    profile_img_placeholder = st.empty()
+                    photo_to_show = None
+                    if st.session_state['uploaded_photo_cache'] is not None:
+                        photo_to_show = st.session_state['uploaded_photo_cache']
+                    
+                    if photo_to_show:
+                        profile_img_placeholder.image(photo_to_show, width=100)
+                    else:
+                        st.markdown("<div style='text-align:center; color:#B0B8C1; font-size:40px;'>👤</div>", unsafe_allow_html=True)
+
+                # 수정 기능은 Expander로 숨김
+                with st.expander("프로필 수정 / 사진 업로드"):
+                    new_vision = st.text_area("나의 비전", value=st.session_state['my_profile']['vision'])
+                    new_sns = st.text_input("SNS 링크", value=st.session_state['my_profile']['sns'])
+                    
+                    uploaded_file = st.file_uploader("사진 변경", type=['jpg', 'png'], key="profile_upload_main", label_visibility="collapsed")
+                    if uploaded_file:
+                        st.session_state['uploaded_photo_cache'] = uploaded_file
+                        st.rerun()
+
+                    if st.button("정보 저장", key="save_profile_main"):
+                        st.session_state['my_profile']['vision'] = new_vision
+                        st.session_state['my_profile']['sns'] = new_sns
+                        save_current_user_state(user_id)
+                        st.success("저장되었습니다.")
+                        time.sleep(1)
+                        st.rerun()
+
+        # 4. [메시지 센터]
+        st.markdown("<div class='main-card'>", unsafe_allow_html=True)
+        st.subheader(f"📨 알림 센터 ({len([m for m in st.session_state['board_messages'] if m['code'] == user_id])})")
         
-        st.divider()
-        st.subheader(f"📨 {user_name}님에게 남겨진 메시지")
         my_messages = [m for m in st.session_state['board_messages'] if m['code'] == user_id]
-        
         if my_messages:
             for m in my_messages:
-                st.markdown(f"<div class='chat-box'><div class='chat-user'>{m['user']} <span style='font-weight:normal; color:#888;'>님이 작성</span></div><div class='chat-msg'>{m['msg']}</div><div class='chat-time'>{m['time']}</div></div>", unsafe_allow_html=True)
+                st.markdown(f"""
+                <div class='msg-card'>
+                    <div style='display:flex; justify-content:space-between; margin-bottom:4px;'>
+                        <span style='font-weight:700; color:#191F28;'>{m['user']}</span>
+                        <span style='font-size:11px; color:#8B95A1;'>{m['time']}</span>
+                    </div>
+                    <div style='color:#4E5968; font-size:14px;'>{m['msg']}</div>
+                </div>
+                """, unsafe_allow_html=True)
         else:
-            st.info("아직 도착한 메시지가 없습니다.")
+            st.markdown("<div style='text-align:center; padding:20px; color:#B0B8C1;'>새로운 알림이 없습니다.</div>", unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
 
     with tabs[1]:
         st.markdown("<h4 style='margin-bottom: 15px; font-weight: 800;'>관심 종목</h4>", unsafe_allow_html=True)
@@ -301,7 +397,7 @@ def render_ui():
                     st.markdown("<hr style='margin: 6px 0 0 0; border: 0; border-top: 1px solid #F2F4F6;'>", unsafe_allow_html=True)
 
     with tabs[2]:
-        # [DESIGN FIX V1.9.2] 호가창 텍스트 색상 강제 적용 (버튼 내부 요소까지 침투)
+        # 호가창 텍스트 색상 강제 적용
         st.markdown("""
             <style>
             div[data-testid="column"] { padding: 0px !important; }
@@ -317,7 +413,7 @@ def render_ui():
             }
             .hoga-row-height { height: 28px !important; line-height: 28px !important; }
             
-            /* [중요] flex: 1.5로 지정된 컬럼 내부의 모든 버튼 글자색을 빨간색으로 강제 */
+            /* 빨간색 강제 */
             div[data-testid="column"][style*="1.5"] button,
             div[data-testid="column"][style*="1.5"] button p,
             div[data-testid="column"][style*="1.5"] button div,
@@ -326,7 +422,7 @@ def render_ui():
                 font-weight: 800 !important; 
             }
 
-            /* [중요] flex: 1.6으로 지정된 컬럼 내부의 모든 버튼 글자색을 파란색으로 강제 */
+            /* 파란색 강제 */
             div[data-testid="column"][style*="1.6"] button,
             div[data-testid="column"][style*="1.6"] button p,
             div[data-testid="column"][style*="1.6"] button div,
@@ -380,7 +476,7 @@ def render_ui():
 
         st.markdown("<div class='hoga-container'>", unsafe_allow_html=True)
         
-        # [매도 호가 (Top) - 빨간색 (Red)]
+        # [매도 호가 (Top) - 빨간색]
         sell_rows_data = []
         for p, q in best_asks:
             sell_rows_data.append((p, q))
@@ -388,7 +484,6 @@ def render_ui():
             sell_rows_data.insert(0, (None, None))
             
         for p, q in sell_rows_data:
-            # [KEY] 1.5 = Red Force (버튼 글자색 빨강 적용)
             c1, c2, c3 = st.columns([1, 1.5, 1], gap="small")
             with c1: 
                 if q: st.markdown(f"<div class='hoga-row-height' style='text-align:right; padding-right:12px; font-size:12px; color:#4E5968;'>{q:,}</div>", unsafe_allow_html=True)
@@ -396,7 +491,6 @@ def render_ui():
             with c2: 
                 if p:
                     if not is_me: 
-                        # 여기 버튼의 글씨가 빨간색이 됩니다.
                         if st.button(f"{p:,}", key=f"ask_btn_{target}_{p}", type="secondary"):
                             quick_buy_popup(target, p, market['name'])
                     else: 
@@ -416,7 +510,7 @@ def render_ui():
             </div>
         """, unsafe_allow_html=True)
 
-        # [매수 호가 (Bottom) - 파란색 (Blue)]
+        # [매수 호가 (Bottom) - 파란색]
         buy_rows_data = []
         for p, q in best_bids:
             buy_rows_data.append((p, q))
@@ -424,7 +518,6 @@ def render_ui():
             buy_rows_data.append((None, None))
             
         for p, q in buy_rows_data:
-            # [KEY] 1.6 = Blue Force (버튼 글자색 파랑 적용)
             c1, c2, c3 = st.columns([1, 1.6, 1], gap="small")
             with c1: 
                  st.markdown("", unsafe_allow_html=True)
