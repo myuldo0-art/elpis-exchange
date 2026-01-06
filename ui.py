@@ -207,6 +207,7 @@ def render_ui():
             else: st.warning("이미 채굴했습니다.")
         
         st.divider()
+        # [확인] 메시지 타이틀 18px 유지 (모바일 깨짐 방지)
         st.markdown(f"<div style='font-size:18px; font-weight:700; color:#191F28; margin-bottom:10px;'>📨 {user_name}님에게 남겨진 메시지</div>", unsafe_allow_html=True)
         
         my_messages = [m for m in st.session_state['board_messages'] if m['code'] == user_id]
@@ -217,22 +218,19 @@ def render_ui():
             st.info("아직 도착한 메시지가 없습니다.")
 
     with tabs[1]:
-        # [수정] 관심 탭의 시각적 요소 강화를 위한 CSS 주입
+        # [확인] 관심 탭 버튼 시각적 강화 CSS 유지
         st.markdown("""
             <style>
-            /* flex: 4 인 컬럼 (종목명) 버튼 타겟팅 */
             div[data-testid="column"][style*="flex: 4"] button p {
                 font-size: 19px !important;
-                color: #7048E8 !important; /* 선명한 보라색 */
+                color: #7048E8 !important;
                 font-weight: 800 !important;
             }
-            /* flex: 1 인 컬럼 (X버튼) 타겟팅 */
             div[data-testid="column"][style*="flex: 1"] button p {
                 font-size: 18px !important;
-                color: #E22A2A !important; /* 선명한 빨간색 */
+                color: #E22A2A !important;
                 font-weight: 900 !important;
             }
-            /* 버튼 Hover 효과 */
             div[data-testid="column"][style*="flex: 4"] button:hover {
                 border-color: #7048E8 !important;
                 background-color: rgba(112, 72, 232, 0.05) !important;
@@ -274,7 +272,7 @@ def render_ui():
                     r1, r2, r3, r4 = st.columns([4, 3, 2, 1], gap="small")
 
                     with r1:
-                        # [수정] 버튼 텍스트: 보라색 & 굵게 & 큼직하게 (CSS가 우선 적용되나 Markdown으로 이중 보장)
+                        # [확인] 보라색 + 굵게 유지
                         if st.button(f"{info['name']}", key=f"fav_btn_{code}", type="secondary", use_container_width=True):
                             st.session_state['view_profile_id'] = code
                             st.session_state['selected_code'] = code 
@@ -292,7 +290,6 @@ def render_ui():
                             </div>
                         """, unsafe_allow_html=True)
                     with r4:
-                        # [수정] X 버튼: 굵은 곱셈 기호로 변경하여 시인성 확보
                         if st.button("✖", key=f"del_{code}"): 
                             st.session_state['my_profile']['likes'].remove(code)
                             save_current_user_state(user_id)
@@ -301,6 +298,7 @@ def render_ui():
                     st.markdown("<hr style='margin: 6px 0 0 0; border: 0; border-top: 1px solid #F2F4F6;'>", unsafe_allow_html=True)
 
     with tabs[2]:
+        # [수정] 돋보기 버튼(1.05 컬럼) 1.5배 확대용 CSS 추가
         st.markdown("""
             <style>
             div[data-testid="column"] { padding: 0px !important; }
@@ -316,25 +314,28 @@ def render_ui():
             }
             .hoga-row-height { height: 28px !important; line-height: 28px !important; }
             
-            div[data-testid="column"][style*="1.5"] button,
             div[data-testid="column"][style*="1.5"] button p,
-            div[data-testid="column"][style*="1.5"] button div,
             div[data-testid="column"][style*="1.5"] button span { 
                 color: #E22A2A !important; 
                 font-weight: 800 !important; 
             }
 
-            div[data-testid="column"][style*="1.6"] button,
             div[data-testid="column"][style*="1.6"] button p,
-            div[data-testid="column"][style*="1.6"] button div,
             div[data-testid="column"][style*="1.6"] button span { 
                 color: #2A6BE2 !important; 
                 font-weight: 800 !important; 
             }
+
+            /* 돋보기 버튼 1.5배 확대 */
+            div[data-testid="column"][style*="flex: 1.05"] button p {
+                font-size: 26px !important; 
+                padding-bottom: 3px;
+            }
             </style>
         """, unsafe_allow_html=True)
 
-        col_s1, col_s2 = st.columns([3, 1])
+        # [수정] 돋보기 버튼 CSS 타겟팅을 위해 비율 1.05로 미세 조정
+        col_s1, col_s2 = st.columns([3, 1.05])
         search_q = col_s1.text_input("검색 (ID/이름)", placeholder="종목 검색...", label_visibility="collapsed")
         if col_s2.button("🔍"):
             found = False
