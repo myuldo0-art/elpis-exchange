@@ -217,9 +217,31 @@ def render_ui():
             st.info("아직 도착한 메시지가 없습니다.")
 
     with tabs[1]:
+        # [수정] 관심 탭의 시각적 요소 강화를 위한 CSS 주입
+        st.markdown("""
+            <style>
+            /* flex: 4 인 컬럼 (종목명) 버튼 타겟팅 */
+            div[data-testid="column"][style*="flex: 4"] button p {
+                font-size: 19px !important;
+                color: #7048E8 !important; /* 선명한 보라색 */
+                font-weight: 800 !important;
+            }
+            /* flex: 1 인 컬럼 (X버튼) 타겟팅 */
+            div[data-testid="column"][style*="flex: 1"] button p {
+                font-size: 18px !important;
+                color: #E22A2A !important; /* 선명한 빨간색 */
+                font-weight: 900 !important;
+            }
+            /* 버튼 Hover 효과 */
+            div[data-testid="column"][style*="flex: 4"] button:hover {
+                border-color: #7048E8 !important;
+                background-color: rgba(112, 72, 232, 0.05) !important;
+            }
+            </style>
+        """, unsafe_allow_html=True)
+
         st.markdown("<h4 style='margin-bottom: 15px; font-weight: 800;'>관심 종목</h4>", unsafe_allow_html=True)
 
-        # [수정] 헤더 글자 크기 확대 (12px -> 15px)
         h1, h2, h3, h4 = st.columns([4, 3, 2, 1], gap="small")
         h1.markdown("<span style='color:#8B95A1; font-size:15px; padding-left:4px;'>종목명</span>", unsafe_allow_html=True)
         h2.markdown("<span style='color:#8B95A1; font-size:15px; display:block; text-align:right;'>현재가</span>", unsafe_allow_html=True)
@@ -252,27 +274,26 @@ def render_ui():
                     r1, r2, r3, r4 = st.columns([4, 3, 2, 1], gap="small")
 
                     with r1:
-                        # [수정] 종목명 버튼: 클릭 가능함을 시각적으로 알리기 위해 보라색(:violet) 및 크기 확대(###) 적용
-                        if st.button(f"### :violet[{info['name']}]", key=f"fav_btn_{code}", type="secondary", use_container_width=True):
+                        # [수정] 버튼 텍스트: 보라색 & 굵게 & 큼직하게 (CSS가 우선 적용되나 Markdown으로 이중 보장)
+                        if st.button(f"{info['name']}", key=f"fav_btn_{code}", type="secondary", use_container_width=True):
                             st.session_state['view_profile_id'] = code
                             st.session_state['selected_code'] = code 
                             st.rerun()
                     with r2:
-                        # [수정] 가격 폰트 크기 확대 (13px -> 18px)
                         st.markdown(f"""
                             <div style='text-align:right; padding-top: 10px; font-weight:700; font-size:18px; color:{color}; letter-spacing:-0.5px;'>
                                 {c_price:,}
                             </div>
                         """, unsafe_allow_html=True)
                     with r3:
-                        # [수정] 등락률 폰트 크기 확대 (11px -> 15px)
                         st.markdown(f"""
                             <div style='margin-top: 8px; float:right; background-color: {bg_color}; color: {color}; padding: 2px 4px; border-radius: 4px; font-size:15px; font-weight: 600; white-space: nowrap;'>
                                 {abs(c_change)}%
                             </div>
                         """, unsafe_allow_html=True)
                     with r4:
-                        if st.button("✕", key=f"del_{code}"): 
+                        # [수정] X 버튼: 굵은 곱셈 기호로 변경하여 시인성 확보
+                        if st.button("✖", key=f"del_{code}"): 
                             st.session_state['my_profile']['likes'].remove(code)
                             save_current_user_state(user_id)
                             st.rerun()
