@@ -4,6 +4,7 @@ import datetime
 import plotly.graph_objects as go
 import time
 import random
+import base64
 
 from database import save_db
 from logic import place_order, mining, save_current_user_state
@@ -17,7 +18,7 @@ def falling_coins():
             pointer-events: none; z-index: 9999;
         }
         .coin-particle {
-            position: absolute; top: -50px; font-size: 30px;
+            position: absolute; top: -50px;
             animation: fall linear forwards;
         }
         @keyframes fall { to { transform: translateY(110vh) rotate(360deg); } }
@@ -30,7 +31,8 @@ def falling_coins():
         left = random.randint(0, 95)
         duration = random.uniform(1.5, 3.0)
         delay = random.uniform(0, 1.5)
-        coin_html += f'<div class="coin-particle" style="left:{left}%; animation: fall {duration}s {delay}s linear forwards;">🪙</div>'
+        size = random.randint(20, 35)
+        coin_html += f'<div class="coin-particle" style="left:{left}%; font-size:{size}px; animation: fall {duration}s {delay}s linear forwards;">🪙</div>'
     coin_html += '</div>'
     
     placeholder.markdown(coin_html, unsafe_allow_html=True)
@@ -112,6 +114,37 @@ def quick_sell_popup(code, price, name):
             else:
                 st.error(msg)
 
+# --- [팝업: 프로필 정보] (JEMI: 화면 딸려감 해결을 위해 모달로 분리) ---
+@st.dialog("👤 프로필 정보")
+def profile_popup(target_id):
+    target_name = st.session_state['user_names'].get(target_id, target_id)
+    
+    p_vision = "정보 없음"
+    p_sns = "정보 없음"
+    p_photo = None
+    
+    if target_id in st.session_state['user_states']:
+        user_data = st.session_state['user_states'][target_id]['my_profile']
+        p_vision = user_data.get('vision', '정보 없음')
+        p_sns = user_data.get('sns', '정보 없음')
+        p_photo = user_data.get('photo', None)
+    elif target_id in st.session_state['market_data']:
+        p_vision = st.session_state['market_data'][target_id].get('desc', '정보 없음')
+    
+    st.markdown(f"<div class='profile-card' style='margin-bottom:0px;'><h2>{target_name} <small>({target_id})</small></h2><hr style='border: 0; border-top: 1px solid #F2F4F6;'></div>", unsafe_allow_html=True)
+    
+    if p_photo:
+        st.image(p_photo, width=150)
+    else:
+        st.markdown("<div style='text-align:center; padding:20px; color:#B0B8C1; background:#F9FAFB; border-radius:12px; margin-bottom:15px;'>사진 없음</div>", unsafe_allow_html=True)
+        
+    st.markdown(f"<p><b>Vision:</b> {p_vision}</p><p><b>SNS:</b> {p_sns}</p>", unsafe_allow_html=True)
+    
+    st.divider()
+    if st.button("닫기", type="primary", use_container_width=True):
+        st.session_state['view_profile_id'] = None
+        st.rerun()
+
 # --- [UI 렌더링 메인 함수] ---
 def render_ui():
     user_id = st.session_state['user_info'].get('id', 'Guest')
@@ -123,22 +156,9 @@ def render_ui():
     if 'likes' not in st.session_state['my_profile']:
         st.session_state['my_profile']['likes'] = []
 
+    # [JEMI FIX] 프로필 뷰를 메인 화면 상단이 아닌 '팝업(Dialog)'으로 처리하여 화면 밀림 방지
     if st.session_state.get('view_profile_id'):
-        target_id = st.session_state['view_profile_id']
-        target_name = st.session_state['user_names'].get(target_id, target_id)
-        
-        p_vision = "정보 없음"
-        p_sns = "정보 없음"
-        if target_id in st.session_state['user_states']:
-            p_vision = st.session_state['user_states'][target_id]['my_profile']['vision']
-            p_sns = st.session_state['user_states'][target_id]['my_profile']['sns']
-        elif target_id in st.session_state['market_data']:
-             p_vision = st.session_state['market_data'][target_id].get('desc', '정보 없음')
-        
-        st.markdown(f"<div class='profile-card'><h2>👤 {target_name} <small>({target_id})</small></h2><hr style='border: 0; border-top: 1px solid #F2F4F6;'><p><b>Vision:</b> {p_vision}</p><p><b>SNS:</b> {p_sns}</p></div>", unsafe_allow_html=True)
-        if st.button("닫기 (Close)", type="secondary"):
-            st.session_state['view_profile_id'] = None
-            st.rerun()
+        profile_popup(st.session_state['view_profile_id'])
             
     tabs = st.tabs(["메인화면", "관심", "현재가", "주문", "잔고", "내역", "거래소"])
 
@@ -326,6 +346,17 @@ def render_ui():
                 font-size: 26px !important; 
                 padding-bottom: 3px;
             }
+            
+            /* [JEMI CSS] 현재가 탭 종목명 버튼 스타일링 */
+            div[data-testid="stVerticalBlock"] > div > div > div > div > button[kind="tertiary"] {
+                font-size: 24px !important;
+                font-weight: 800 !important;
+                color: #191F28 !important;
+                padding: 0px !important;
+                border: none !important;
+                text-align: left !important;
+                justify-content: flex-start !important;
+            }
             </style>
         """, unsafe_allow_html=True)
 
@@ -353,7 +384,11 @@ def render_ui():
         
         is_me = (target == user_id)
         
-        st.markdown(f"### {market['name']} <span style='font-size:14px; color:gray'>$ELP-{target}</span>", unsafe_allow_html=True)
+        # [JEMI FIX] 종목명 텍스트를 버튼으로 변경하여 프로필 팝업 연동
+        if st.button(f"{market['name']} $ELP-{target}", key="cp_title_btn", type="tertiary"):
+             st.session_state['view_profile_id'] = target
+             st.rerun()
+             
         pc1, pc2 = st.columns(2)
         color_cls = "price-up" if change_pct >= 0 else "price-down"
         pc1.markdown(f"<div class='big-font {color_cls}'>{curr_price:,} ID</div>", unsafe_allow_html=True)
@@ -478,7 +513,6 @@ def render_ui():
         with st.expander("📢 내 엘피스 상장 (IPO)", expanded=True):
             locked = st.session_state['my_elpis_locked']
             st.markdown(f"**보유(Lock): {locked:,} 주**")
-            # [추가] 실시간 예수금 표시
             st.markdown(f"**현재 예수금(ID): {st.session_state['balance_id']:,.0f} ID**")
             
             c1, c2 = st.columns(2)
